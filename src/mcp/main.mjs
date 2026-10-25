@@ -3,7 +3,7 @@ import { BridgeClient } from '../bridge/client.mjs';
 import { createDispatcher } from './server.mjs';
 import { createExactRequestClient } from './exact-request.mjs';
 
-const socketPath = process.env.DSH_AGENT_TEAM_SOCKET;
+const socketPath = process.env.DSH_AGENT_TEAM_SOCKET ?? (process.getuid === undefined ? undefined : `/tmp/dsh-agent-team-${process.getuid()}/native.sock`);
 if (!socketPath) {
   process.stderr.write('Set DSH_AGENT_TEAM_SOCKET to the shared native host IPC socket.\n');
   process.exit(1);

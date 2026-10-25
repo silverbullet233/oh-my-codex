@@ -1,9 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "dsh-agent-team",
-  "version": "0.1.0",
-  "description": "Use Codex as an explicit client of native DSH Sessions and Agent Teams with configurable role profiles.",
-  "author": { "name": "oh-my-codex contributors" },
+  "version": "0.2.0",
+  "description": "Explicit Codex MCP client for native DSH Team roles and Sessions.",
+  "author": {
+    "name": "oh-my-codex contributors"
+  },
   "extensions": {
     "com.openai": {
       "interface": {

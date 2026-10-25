@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { serveBridge } from '../../src/bridge/ipc.mjs';
+import { serveFakeBridge as serveBridge } from '../fixtures/ipc-server.mjs';
 
 function run(socketPath, lines) {
   return new Promise((resolve_, reject) => {
@@ -33,7 +33,8 @@ test('stdio EOF preserves independently owned IPC host and a new client can reco
     assert.equal(result.stderr, '');
     const responses = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
     assert.equal(responses.length, 2);
-    assert.deepEqual(responses[1].result.structuredContent, { ok: true });
+    assert.equal(responses[1].result.structuredContent.ok, true);
+    assert.equal(responses[1].result.structuredContent.protocol.version, 1);
   }
   assert.deepEqual(calls, [{ method: 'health', params: {} }, { method: 'health', params: {} }]);
 });
