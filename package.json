@@ -1,0 +1,25 @@
+{
+  "name": "dsh-agent-team",
+  "version": "0.1.0",
+  "description": "Explicit Codex client and role profiles for a shared native DSH Session service",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./roles": "./src/roles/index.mjs",
+    "./bridge": "./src/bridge/index.mjs",
+    "./auth": "./src/auth/provider.mjs"
+  },
+  "engines": { "node": ">=24.9.0" },
+  "bin": { "dsh-agent-team-mcp": "./src/mcp/main.mjs" },
+  "scripts": {
+    "test": "npm run test:unit",
+    "test:unit": "node --test test/auth/*.test.mjs test/bridge/*.test.mjs test/mcp/*.test.mjs test/roles/*.test.mjs test/native/synthetic-fixtures.test.mjs",
+    "test:native": "node --test test/native/shared-session.test.mjs",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs",
+    "pack:check": "npm pack --dry-run --ignore-scripts",
+    "runtime:prepare": "node scripts/runtime/prepare.mjs",
+    "runtime:verify": "node scripts/runtime/verify.mjs"
+  },
+  "files": ["src", "scripts", "docs", "skills", "plugin.json", "mcp.json", "runtime-lock.json", "PLAN.md", "README.md", "LICENSE"]
+}

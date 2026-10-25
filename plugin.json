@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dsh-agent-team",
+  "version": "0.1.0",
+  "description": "Use Codex as an explicit client of native DSH Sessions and Agent Teams with configurable role profiles.",
+  "author": { "name": "oh-my-codex contributors" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "DSH Agent Team",
+        "shortDescription": "Native DSH team sessions",
+        "longDescription": "Submit and continue native DSH team sessions through the same host used by DSH Web.",
+        "developerName": "oh-my-codex contributors",
+        "category": "Developer Tools",
+        "defaultPrompt": "Use DSH Agent Team for this task."
+      }
+    }
+  }
+}
