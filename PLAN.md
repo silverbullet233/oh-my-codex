@@ -1,27 +1,31 @@
 # dsh-agent-team implementation plan
 
-1. Verify the clean branch, pinned DSH source and available dependencies. Record a reproducible isolated runtime and matching native Web build.
-2. Implement a role plugin in the native host: immutable member bindings, awaited pre-input routing and instructions, recovery, and request-route evidence.
-3. Implement a durable native Session bridge and local UID-restricted IPC. Provide explicit stdio MCP health/create/send/status/result/stop tools without owning the host lifecycle.
-4. Exercise keyless tests against the pinned native runtime, including Team projection visibility, lifecycle, recovery, idempotency, cancellation and approval refusal. Review independently and commit tested increments.
-5. Run bounded synthetic-only live provider and Codex MCP checks, then inspect the rendered native Team page if authorized native browser authentication and matching assets are available. Report gates honestly.
+## Completed
+
+1. Started from the clean `dsh-agent-team` branch at `77ffbdcd3f473c0c834c9276f9559795588e5c63`, without recovering discarded work.
+2. Connected to the complete official DSH source build at `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`. Sealed source, dependencies, host, generated reflection and native Web artifacts; startup checks actual imports and serving services.
+3. Implemented roles, durable immutable member bindings, awaited pre-input routing/instructions, same-member recovery and actual request-route evidence through native extension points.
+4. Implemented durable native Session admission and UID-restricted IPC, with explicit stdio MCP and direct CLI health/create/send/status/result/stop clients.
+5. Passed 17 actual native shared-host scenarios, one validation-scope regression and five runtime checks. Independent review added regressions for delegation bypasses, crash windows, cancellation, unload behavior and whole-Team completion.
+6. Installed the linked native Web bundle through the official profile package manager. Rendered native Team/member tool views with a Lead and two scripted members.
+7. Passed the final 84-test aggregate and build/package checks. A minimal real DeepSeek account request completed on the user's native Session `307febae-d8c0-4f59-b442-6ecd8a7efec1`.
+8. Passed a real Codex subscription `gpt-6.1-sol` / `high` handoff through two MCP calls to the installed user's native host, and live same-Team OpenCode Go/DeepSeek account collaboration with exact `max` routes and audited fixture tools.
+9. Inspected the user's actual native Web Session and its successful nonce response; keep the earlier scripted Team screenshots labeled separately.
+10. Passed a second real outer Codex invocation into the same dual-provider Team, reusing `calc-left` with its unchanged native ID and exact `REUSE_fa56b94b8b` output. Saved real native Chrome Team/member screenshots and removed live inference permission after 23 audited payloads within the 24-payload budget.
+
+11. Fixed independent review findings around credential-safe output/backups and exact synthetic MCP arguments. Replayed final client calls idempotently against the native host with no additional inference. Committed the reviewed implementation as `95ac02d` without pushing.
+
+## Validation limits
+
+- Live cold recovery, changed-role recovery and running steer remain keyless-only claims. No additional live inference is planned or permitted by the removed validation permission file.
+- A future DSH-service/Codex-client repository split is outside this delivery; no repository was created, migrated or published.
 
 ## Invariants
 
-- One native DSH host, SessionController and store serve both Web and Codex. No independent scheduler or dashboard.
-- The reference checkout is read-only. Never recover the discarded implementation. No main/master development, push, global DSH restart, Codex configuration changes, unapproved installs or new credentials.
-- Role configuration contains existing provider references, never credentials. Changed configuration affects new members only.
-- Cross-provider inference uses fresh synthetic fixtures, two narrow fixture tools, audited complete payloads, no repository or personal data, and no general shell/network tools.
-- All repository content is English. Progress reports are Chinese.
-
-## Initial evidence
-
-- Branch: `dsh-agent-team`; clean at `77ffbdcd3f473c0c834c9276f9559795588e5c63`.
-- DSH reference: `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`.
-- Global Homebrew packages verified: TypeScript `6.0.3`, `@earendil-works/pi-ai` `1.3.0`.
-
-## Current checkpoint
-
-The user requested a separate source-install task in `deepseek-harness` before continuing this plugin. All runtime provisioning, dependency installation, native host launch and live testing in this task are paused pending its verified handoff. The sole npm installation was interrupted with confirmed exit code 130. No native host, model request, test daemon or worker-owned subprocess remains active.
-
-The role layer now uses supported native tool guards and an enhanced `spawn_role_teammate`; no native source patch is retained. Independent review identified and prompted fixes for active-turn continuation detection, read-only native credential no-op inspection, the first-role-selection crash window and whole-Team completion reporting. Pure/unit validation is separate from authored but incomplete native, live and rendered checks.
+- One native Web host, SessionController and store serve Web and Codex; no additional scheduler or dashboard.
+- Keep Codex's ordinary configuration and entrypoint unchanged. Never recover deleted work, develop on main/master or push.
+- Consume the verified source-install handoff; do not modify or rebuild that installation from this plugin task. Use one writer per native data directory.
+- Role configuration refers to existing provider registrations and contains no secrets. Changes affect new members only.
+- Live tests use fresh synthetic data, audited complete payloads, two narrow fixture tools and native Team coordination. No repository/personal files, inherited conversations, general shell/network tools or fallback routes.
+- Preserve native authentication, workspaces and approvals. New credentials and user-service lifecycle changes require the applicable authorization.
+- Repository content is English; user-facing progress is Chinese. Text-only operation and unknown costs remain explicit limits.

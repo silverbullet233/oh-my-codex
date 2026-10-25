@@ -1,35 +1,41 @@
-# Runtime preparation checkpoint
+# Native source runtime
 
-Runtime provisioning is paused while a separate source-install task prepares the native DSH installation. Do not run `scripts/runtime/prepare.mjs` or install build dependencies until that work has completed and the parent task explicitly resumes this workflow.
+The plugin connects to the complete native DSH source installation at commit `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`. The absolute CLI is `/Users/mxr/.local/bin/dsh`; its installed target is `/Users/mxr/github/deepseek/deepseek-harness/apps/cli/lib/bin.js`. The packaged Desktop application remains separate and unchanged. An identical `0.2.1-rc.3` version string does not establish that a runtime has the pinned Agent APIs.
 
-## Verified inputs
+## Connect and verify
 
-The read-only reference checkout is `/Users/mxr/github/deepseek/deepseek-harness` at `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`. `runtime-lock.json` records the source dependency lock, the official installed application archive digest, the authorized TypeScript `6.0.3` compiler, and the official pi-ai `1.3.0` patch digest. The reference checkout and global packages were not modified.
+From the plugin checkout:
 
-The isolated copy lives in `.runtime/dsh-source`. Its fresh official Git archive has SHA-256 `b29c96d4f3e6f34ddbcb057a04ec8825bb7ad71fb98ff651a9807391cb78acc2`. Only third-party dependencies and native addon packages were extracted from the currently installed official application archive. No compiled DSH packages, generated Typert descriptors, or frontend assets were taken from that archive.
+```sh
+node scripts/runtime/connect.mjs /Users/mxr/github/deepseek/deepseek-harness
+node scripts/runtime/verify.mjs
+node --test test/runtime/runtime.test.mjs
+```
 
-The authorized global pi-ai package was copied into the isolated runtime and patched there using the pinned official patch, SHA-256 `4e1c90fd00aea42989664504668633033c1962e53c07860901edb4f72d843765`. Global pi-ai remains unchanged. There are no active native-source patches: role enforcement uses supported tool guards.
+The connector changes only plugin-local dependency symlinks. It first checks the complete existing build against the sealed manifest, refuses regular files and unrelated symlinks, and then links public DSH and third-party dependencies to the same source installation. It never builds, installs, modifies the source checkout, changes authentication, starts a host, or changes Codex configuration. Repeated connection to the same build is harmless.
 
-## Available evidence
+`DSH_SOURCE_ROOT` selects another source directory, or callers may pass `runtimeDirectory` to `verifyRuntime()`. The complete build must still match the sealed source and artifact hashes; selecting a directory cannot authorize different code. Run the connector before importing the plugin when changing directories. The CLI entrypoint must resolve to that same verified installation.
 
-The experimental preparation script emitted 2,765 JavaScript modules using the explicit Homebrew TypeScript compiler. Public ESM import smokes passed for the native Agent, Agent Loop Testkit, SessionController, gateway, Team service, and Team tools. This is source transpilation for focused keyless tests; it is not an official full build, has not passed the source typecheck, and has no matching frontend build.
+The mandatory host-plugin verifier checks:
 
-The emitted-file manifest is `.runtime/dsh-source/.runtime-build.json`; its SHA-256 is `32fec80e2205229487974d0289b4d22873b144162f39eec47888721f12f829ed`, and its recorded emission digest is `34c1184ec006f03109115f5dd340b7e757275a566689d6e87cff44c7d4b1aeee`. The verifier is deliberately unsealed: `runtime-lock.json` does not authorize that experimental emission digest. `verifyRuntime()` therefore rejects host-plugin startup before IPC can open.
+- Exact source commit and a clean tracked worktree.
+- Source and installed pnpm locks, install metadata, official patch files, TypeScript `6.0.3` implementation bytes, and patched pi-ai `1.3.0` files.
+- A sealed manifest of 12,902 generated artifact files, including 12,742 native package files and the complete native Web artifacts.
+- The official source build's native Web record: source commit/version plus all 358 frontend files, using the source's own digest algorithm.
+- Actual public Cordis, Agent, SessionController, generated Typert reflection, Team and gateway module paths from the same source checkout, plus the required `agent.model.select/current` capabilities.
 
-`scripts/runtime/verify.mjs` resolves the actual public Agent module, locates its prepared runtime, checks recorded emitted-file checksums against a separately sealed lock, and checks the new `AgentModel.select` and `current` capabilities. The final source-installed runtime must supply equivalent verified evidence; the current helper still expects the isolated project directory and needs adaptation after installation.
+`runtime-lock.json` seals `scripts/runtime/source-build-manifest.json`. The latter contains relative artifact paths and byte hashes without machine paths or timestamps. The bridge calls `verifyRuntime()` before opening IPC. A changed source tree, dependency installation or built artifact fails closed and requires an explicit reviewed lock update after the corresponding complete build; the connector never silently reseals it.
 
-## Stopped installation
+## One native host for Web and Codex
 
-One isolated official npm registry installation was started for the versions listed in `.runtime/build-tools/package.json`. The task then received an explicit pause instruction. Its own tool session `81783` was interrupted through that session and exited with code `130`; no process ID was returned. No broad process termination was used. The prefix contains only its manifest: there is no `node_modules` directory or npm lockfile, and installation was not retried.
+The plugin's two native plugins are `dsh-agent-team/roles` and `dsh-agent-team/bridge`. Load them into the same source-built native Web profile that provides SessionController and native Agent Team services. Keep native collaboration tools, workspace policies, tools and approvals in that profile. Point the disposable stdio MCP client at that host's private Unix socket. Closing the client leaves the native host running.
 
-The request manifest `scripts/runtime/build-tools-request.json` records the larger source Web dependency request. The actual attempted npm manifest excluded the CDN-hosted SheetJS package. The official installed archive contains no standalone `xlsx` package, and the pinned SheetJS CDN URL has not been downloaded or replaced with another version.
+Run `npm run test:native` for keyless validation using temporary native Contexts and synthetic stores. The earlier isolated browser-host launch helpers have been removed; live validation and ordinary use attach to the installed user's native Web host. Start only one native host per writable DSH data directory. Use the native URL and supported authentication flow; do not copy browser credentials or disable Host, Origin or Cookie checks. The plugin does not provide a second Web interface or scheduler.
 
-## Remaining work after resume
+## Build evidence and limits
 
-- Use one complete matching native host and frontend from the separate source-install task, with the pinned new Agent APIs. Do not combine old DSH code or frontend bundles with it.
-- Run the official source artifact and check builds with locked dependencies and required official patches.
-- Generate current Typert reflection; `@deepseek-ai/dsh-api-session-controller/typert` is currently absent, so native controller integration cannot complete yet.
-- Fix or retire the experimental forwarding emitter before using it again: it does not detect re-exported defaults such as `export { default } from ...`.
-- Seal verified runtime evidence only after the final build, then run runtime guard, native integration, live synthetic-only, and rendered native Team checks.
+The separate source-install task ran the official `pnpm run build`: all ten reported build/check stages passed. It also reported 132 focused unit tests and one built Team test. Its plain-Node built-library probe confirmed the new Agent APIs and native Team task operations without model requests. Its native HTTP smoke confirmed unauthorized `401`, the supported token exchange, authenticated native index/assets and Session listing. It did not verify browser rendering.
 
-No DSH host or daemon was started by this runtime worker. No authentication material was read, generated, copied, or changed. No global DSH installation, service, or Codex configuration was changed.
+The current source build uses the ordinary local build profile from official source, rather than the release branding profile. Its frontend records commit `22ddee3`, version `0.2.1-rc.3`, and artifact digest `2656444b8a8921d549798696e7eb2d1dbb717d71481c4746b07ac0eeeb0551fe`. The plugin runtime checks do not independently rerun the upstream source build or upstream tests; those reported checks are recorded separately from current plugin tests.
+
+The old experimental archive/transpilation scripts have been removed. The connector and verifier consume no packaged application DSH code, old generated descriptors or old frontend assets. They do not read or modify global pi-ai. Live provider requests and rendered native Team verification are recorded separately in [validation evidence](validation.md).

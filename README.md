@@ -1,48 +1,85 @@
 # dsh-agent-team
 
-An explicit Codex MCP client and role plugin for the **same native DSH Session service used by DSH Web**. Native Agent Teams owns members, tasks, CAS, messages, activation, tools and approvals. This project adds role profiles and durable client admission metadata. It does not own an execution scheduler or provide another dashboard.
+An explicit Codex MCP client and role plugin for the **same native DSH Session service used by DSH Web**. Native Agent Teams owns members, tasks, CAS, messages, activation, tools and approvals. This project adds configurable roles and durable input correlations, with no separate scheduler or dashboard.
 
-**Development checkpoint:** the implementation is awaiting a verified complete DSH source installation from a separate task. Runtime provisioning and native/live/browser validation are paused. The current experimental source transpilation is deliberately unsealed; plugin startup fails closed. This is not a completed or installed integration.
+The required runtime is official DSH commit `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`, built with its matching native Web frontend. The released `dsh-v0.2.1-rc.3` commit `1f81c047fc48fa190a683e469daa699857e9afe8` lacks the required `agent.model.select/current` APIs despite sharing version text. No legacy adapter is included.
 
-The target is official DSH commit `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`. The installed `dsh-v0.2.1-rc.3` release commit `1f81c047fc48fa190a683e469daa699857e9afe8` lacks the new `agent.model.select/current` APIs. Its existing native Session/Web capabilities are not the gap. A complete matching source build supplies the required APIs; identical package version text does not establish source identity. No legacy adapter is included.
-
-## Architecture
+## Shared native host
 
 ```text
-Codex (explicit MCP tools) -> disposable stdio client -> private Unix socket
-                                                        |
-Native DSH Web <-> native Connection/Gateway/SessionController
-                                      |                 |
-                           native Agent Team + role plugin
-                                      |
-                        one native Session/store/runtime
+Codex explicit MCP client -> stdio -> private Unix IPC --+
+Direct CLI client -------------------------------------+
+                                                       |
+Native DSH Web <-> Connection/Gateway/SessionController <-+
+                                  |
+                    native Agent Team + role profiles
+                                  |
+                        one Session store/runtime
 ```
 
-The host loads the `dsh-agent-team/roles` and `dsh-agent-team/bridge` package exports alongside native Agent Team, its tool layer and its native Web UI. The bridge uses a public in-process owner Peer with `interactions: none`; it exposes no owner network endpoint and cannot answer approvals. Web retains native Host, Origin and Cookie authentication. The optional `dsh-agent-team/auth` export reads existing native credentials without changing them.
+The installable bundle's `cordis.patch.yml` loads `dsh-agent-team/host` into the existing native Web profile. That export composes roles and the bridge beside the official Agent Teams profile bundle, retaining native Team and member views. Startup verifies the sealed complete source build, actual public imports and serving service identities before opening IPC. See [runtime verification](docs/runtime.md).
 
-Each role configures `description`, `instructions`, an existing registered `provider`, `model` and optional `reasoningEffort`. Several named instances can share a role. The Lead profile is reserved before native Session creation; member snapshots are durable before native provisioning. The awaited creation hook installs scoped instructions and the initial model route before input. Existing members retain their snapshots after configuration changes. See [role policy](src/roles/README.md) and [existing authentication](docs/auth.md).
+The bridge uses a supported in-process owner Peer with `interactions: none`. It cannot answer approvals and exposes no owner network endpoint. Native Host, Origin, Cookie, workspace and approval policies remain effective. The socket directory belongs to the current OS UID with mode `0700`; the socket is `0600`. Closing a client leaves native execution running.
 
-`spawn_role_teammate` selects an allowlisted role. The unchanged native tool layer retains collaboration tools. A native monotonic guard refuses its original `spawn_teammate` and general spawn/fork alternatives for bound members; the original tool remains visible because the public API cannot hide a scope-local registration. No native source patch is required.
+Each role specifies `description`, `instructions`, an existing registered `provider`, `model` and optional `reasoningEffort`; multiple named members may share a role. Immutable snapshots are durable before provisioning. The awaited creation hook installs instructions and selects the route before first input. Configuration changes affect new members; follow-up and recovery retain member identity. `spawn_role_teammate` selects an allowlisted role. Native guards refuse original, aliased and unreserved delegation for managed members, while ordinary unmanaged Web Teams remain available. See [role policy](src/roles/README.md).
 
-## MCP interface
+## Install and use
 
-| Tool | Purpose |
-| --- | --- |
-| `dsh_team_health` | Verify shared host and inspect its role catalog |
-| `dsh_team_create` | Submit text with a durable caller key and authorized `cwd` |
-| `dsh_team_send` | Queue or steer the same Session with a durable input ID |
-| `dsh_team_status` | Read native runtime/task state, members, routes and recent activity |
-| `dsh_team_result` | Read native output and processed-input evidence |
-| `dsh_team_stop` | Request native cancellation without rolling back files |
+Connect this checkout to the already built source installation and verify it:
 
-Create and send reject reuse of an idempotency key with different content. An accepted input may still be queued or executing. After an uncertain response, inspect status and retain the original key/ID. A cold create retry before initial admission returns `accepted: false`, the reserved IDs and `requiresContinuation: true`; an unconfirmed prior admission returns `accepted: null`. Inspect status and explicitly continue using the returned input ID. Cold or interrupted continuation requires `continue: true`. `rootTurnCompleted` describes the Lead's turn; `completed` describes the whole observed Team and is `null` when cold member activity is unknown. Configured, currently selected and last-request routes are separate fields; unloaded selection and unknown usage/fees are `null`.
+```sh
+node scripts/runtime/connect.mjs /Users/mxr/github/deepseek/deepseek-harness
+node scripts/runtime/verify.mjs
+```
 
-The stdio command is `node /absolute/plugin/path/src/mcp/main.mjs`, with `DSH_AGENT_TEAM_SOCKET` set to the shared host's private socket. The host config requires private `stateDirectory` and `socketPath` paths and explicit `allowedRoots`. The socket parent must belong to the same OS UID with mode `0700`; the socket is `0600`. Closing an MCP client leaves the host and native execution running. `mcp.json` describes this explicit client; it does not change Codex configuration, entrypoint or model defaults.
+The connector changes only plugin-local dependency links; it neither installs nor builds DSH. The complete source manifest pins the host, dependencies, generated reflection and frontend together.
 
-## Validation and next steps
+The native Web profile must include `@deepseek-ai/dsh-experimental-agent-team-profile`. `node scripts/install-native.mjs` prepares nonsecret configuration at `~/.dsh/dsh-agent-team.json` and guarded profile backups. A fresh default configuration loads roles and the bridge without temporary validation-fixture dependencies; an optional first argument naming a validation `run.json` explicitly enables that fixture. Existing configuration is preserved.
 
-`npm run test:unit` runs protocol, private IPC, metadata, role-record, credential and synthetic-fixture checks. IPC tests require permission to bind a local Unix socket. `npm run test:native` is the separate actual-runtime suite; it is authored but has not passed against the final runtime. `npm run build` assembles the ESM plugin, not DSH itself. `npm run pack:check` inspects package contents. If the user npm cache is unwritable, run `npm --cache /tmp/dsh-agent-team-npm-cache pack --dry-run --ignore-scripts` without changing global cache ownership.
+Host fields are `stateDirectory`, `socketPath`, `allowedRoots`, `leadRole` and `roles`. Paths identify private state/IPC directories and authorized workspaces. Providers refer to existing native registrations; role configuration contains no credentials or endpoint overrides. `examples/roles.json` is overlay-generator input: omit its `nativeTeam` option from the installable host configuration.
 
-The next gate is a complete pinned native host and matching frontend, regenerated Typert metadata and source integrity checks. Then run native integration, bounded live Codex subscription `gpt-6.1-sol` with effort `high`, and one Team containing `opencode-go/deepseek-v4.1-flash` and `deepseek-account/deepseek-flash` at supported `max`. Live checks must use fresh audited synthetic fixtures with only two narrow fixture file tools. No final-code live result or rendered native Team screenshot exists yet. See [validation evidence](docs/validation.md), [runtime handoff](docs/runtime.md) and [plan](PLAN.md).
+Install through DSH's profile package manager, then launch the ordinary native Web profile when a host start is intended:
 
-Inputs are text-only initially. Image, audio, video and attachment propagation are not supported promises. Native workspace and approval policies remain authoritative. This project has not installed a plugin, replaced global DSH, restarted a user service, changed Codex configuration or created persistent authentication credentials.
+```sh
+/Users/mxr/.local/bin/dsh plugin --profile web add link:/Users/mxr/github/silverbullet233/oh-my-codex --ignore-scripts
+/Users/mxr/.local/bin/dsh web --no-open
+```
+
+This checkout is currently installed as a linked package in the user's Web profile. Use one host per writable native data directory; clients attach to its socket. Supported native authentication remains required. The optional [read-only credential provider](docs/auth.md) cannot create, migrate or refresh credentials.
+
+`node scripts/start-native.mjs --shell-env` starts that same ordinary Web command through `zsh -ic`, inheriting the user's normal shell environment, including existing native provider references. It does not copy or migrate credentials, and suppresses raw shell/host output. Apply host lifecycle changes only when intended; starting another process against an active data directory is not a client connection.
+
+Installation rollback metadata and guarded nonsecret profile backups are under `~/.dsh/dsh-agent-team/install-backup-<timestamp>/`. Reconciliation backups are `~/.dsh/dsh-agent-team/profile-before-reconcile-<timestamp>.yml`. The official removal command is `/Users/mxr/.local/bin/dsh plugin --profile web remove dsh-agent-team`; use the native service workflow when applying a rollback. Neither installation nor rollback changes saved Codex configuration or backs up credentials.
+
+Both clients expose six operations:
+
+| CLI method | MCP tool | Purpose |
+| --- | --- | --- |
+| `health` | `dsh_team_health` | Runtime evidence and role catalog |
+| `create` | `dsh_team_create` | Native Session creation and initial text admission |
+| `send` | `dsh_team_send` | Queue or steer with a durable input ID |
+| `status` | `dsh_team_status` | Native task/runtime state, members, routes and activity |
+| `result` | `dsh_team_result` | Output and processed-input evidence |
+| `stop` | `dsh_team_stop` | Native cancellation, retaining file changes |
+
+```sh
+node scripts/client.mjs health
+node scripts/client.mjs create '{"key":"task-1","cwd":"/absolute/authorized/workspace","text":"Describe the requested task."}'
+node scripts/client.mjs status '{"teamId":"returned-session-id"}'
+```
+
+Set `DSH_AGENT_TEAM_SOCKET` for a nondefault socket; the default is `/tmp/dsh-agent-team-<uid>/native.sock`. The stdio MCP command is `node /absolute/plugin/path/src/mcp/main.mjs`. `mcp.json` describes explicit use and changes no Codex configuration, entrypoint, subscription or model defaults.
+
+Create keys and input IDs reject different content. Acceptance is distinct from processing. After an uncertain response, retain the original key/ID and inspect status. A cold initial-create retry returns reserved IDs and `requiresContinuation: true`, with `accepted: false` when no receipt exists or `null` when admission is unconfirmed. Continue explicitly using the returned input ID and `continue: true`.
+
+`rootTurnCompleted` describes the Lead; `completed` describes the observed Team. Native inactive children can be confirmed complete through durable projections without activation. Missing evidence remains unknown; an open or interrupted child turn cannot reuse an earlier completed outcome. Configured, selected and last-request routes are separate. Unloaded selection and unknown usage/fees are `null`.
+
+## Validation and limits
+
+Run `npm run test:unit`, `npm run test:native` and `npm run test:runtime`; Unix IPC tests require local socket permission. `npm run build` packages this ESM plugin, and `npm run pack:check` inspects it. The actual native suite has passed 17 shared-host scenarios plus one validation-scope regression; runtime checks have passed 5 tests. [Validation evidence](docs/validation.md) separates these results from live inference and rendered checks.
+
+The final aggregate passed 84/84 tests, including configuration-backup and exact-request privacy regressions. Build/package checks passed. Real Codex subscription `gpt-6.1-sol` / `high` completed a two-call MCP create/result handoff through the installed user's host. A live native Team completed with `opencode-go/deepseek-v4.1-flash/max` and `deepseek-account/deepseek-flash/max`: its members read/wrote synthetic fixtures, messaged the Lead and returned `left=5`, `right=11`, with exact routes recorded in native headers and audits. No fallback was used.
+
+Another outer Codex invocation sent a follow-up to that same dual-provider Team, reused the existing `calc-left` member and received exact output `REUSE_fa56b94b8b` through one send and three result calls. Native Chrome accessibility and screenshots show the real three-member Team and actual member tool/message traces. See [validation evidence and live screenshots](docs/validation.md).
+
+Inputs are initially text-only. Image, audio, video and attachment propagation are unsupported. Live tests used fresh synthetic fixtures, complete payload auditing and two narrow fixture tools, without repository/personal files, inherited conversations or general shell/network tools. Live inference permission has been removed after validation. Cold member recovery and changed-role recovery are proven by keyless tests, not live inference. Costs remain unknown.
