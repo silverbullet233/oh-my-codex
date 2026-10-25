@@ -1,32 +1,28 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "source": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "commit": "22ddee3792402c3e70ec5f86a63c3e3e895a2f60",
-    "reference": "/Users/mxr/github/deepseek/deepseek-harness",
+    "directory": "/Users/mxr/github/deepseek/deepseek-harness",
     "pnpmLockSha256": "de5ef69ab7f418a6b7e97e83943bdc7b04e943a59c798a1a97aaf3a244c80d73"
   },
-  "compiler": {
-    "name": "typescript",
-    "version": "6.0.3",
-    "path": "/opt/homebrew/lib/node_modules/typescript"
-  },
-  "installedDependencies": {
-    "archive": "/Applications/DeepSeek Harness.app/Contents/Resources/app.asar",
-    "sha256": "848f8437a990ffb88fca6772eb8e0e69af84d066c76087ac973a8d8015b459f4",
-    "policy": "Only third-party dependencies and native addon packages; no compiled DSH packages or frontend assets."
-  },
-  "piAi": {
-    "name": "@earendil-works/pi-ai",
-    "version": "1.3.0",
-    "path": "/opt/homebrew/lib/node_modules/@earendil-works/pi-ai",
-    "patch": "patches/@earendil-works__pi-ai@1.3.0.patch",
-    "patchSha256": "4e1c90fd00aea42989664504668633033c1962e53c07860901edb4f72d843765"
-  },
-  "patches": [],
+  "entrypoint": "/Users/mxr/.local/bin/dsh",
   "build": {
-    "kind": "source-transpilation",
-    "frontend": "pending-approved-build-tools",
-    "officialBundle": false
+    "kind": "official-source-build",
+    "command": "pnpm run build",
+    "profile": "local",
+    "manifest": "scripts/runtime/source-build-manifest.json",
+    "manifestSha256": "cf7c9e592ae404efb0447e45ba540f60ea7dabb7c458ac872baf29aac5ba0a2d",
+    "frontend": true,
+    "typechecked": true
+  },
+  "validation": {
+    "officialBuild": {
+      "passed": 10,
+      "failed": 0
+    },
+    "unitTests": 132,
+    "builtTeamTests": 1,
+    "sourceInstallReport": "/tmp/dsh-source-install-22ddee3/after.json"
   }
 }

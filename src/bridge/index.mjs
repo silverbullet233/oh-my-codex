@@ -9,7 +9,25 @@ import { BridgeError } from './errors.mjs';
 import { verifyRuntime } from '../../scripts/runtime/verify.mjs';
 
 export const name = 'dsh-agent-team-bridge';
-export const inject = ['connection', 'typertGateway', 'sessionController', 'sessionProjections', 'sessions', 'agents', 'agentTeams', 'dshRoles'];
+export const inject = ['connection', 'typertGateway', 'sessionController', 'sessionProjections', 'sessions', 'agents', 'agentTeams', 'workspaceRegistry', 'dshRoles'];
+
+/** A plugin-local verified import cannot establish the identity of an unrelated serving host. */
+export async function assertNativeHost(ctx) {
+  const [agent, session, controller, team, connection, gateway] = await Promise.all([
+    import('@deepseek-ai/dsh-agent'), import('@deepseek-ai/dsh-session'),
+    import('@deepseek-ai/dsh-api-session-controller'), import('@deepseek-ai/dsh-experimental-agent-team'),
+    import('@deepseek-ai/dsh-client-connection'), import('@deepseek-ai/dsh-api-gateway'),
+  ]);
+  for (const [name, implementation] of [
+    ['agents', agent.AgentRegistry], ['sessions', session.SessionStore],
+    ['sessionController', controller.SessionController], ['agentTeams', team.TeamService],
+    ['connection', connection.HostConnectionService], ['typertGateway', gateway.TypertGatewayService],
+  ]) {
+    if (!(ctx[name] instanceof implementation)) {
+      throw new BridgeError('HOST_RUNTIME_MISMATCH', `The serving ${name} service does not belong to the verified native runtime.`);
+    }
+  }
+}
 
 /** Compose into an existing matching native host. No host, account, token or HTTP server is created. */
 export async function apply(ctx, config) {
@@ -17,6 +35,7 @@ export async function apply(ctx, config) {
     throw new BridgeError('INVALID_CONFIG', 'stateDirectory and socketPath are required.');
   }
   const runtimeEvidence = await verifyRuntime();
+  await assertNativeHost(ctx);
   const { z } = await import('zod');
   const projection = await ctx.sessionProjections.register(bridgeProjectionDefinition(z));
   const store = await new BridgeStore(join(config.stateDirectory, 'bridge')).open();

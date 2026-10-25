@@ -1,0 +1,6 @@
+# Install alongside the official Agent Teams profile bundle. Its native services,
+# collaboration tools and UI remain the sole Team implementation.
+- insert:
+    - id: dsh-agent-team
+      name: 'dsh-agent-team/host'
+      config: !!js JSON.parse(process.getBuiltinModule('node:fs').readFileSync(dshHomePath('dsh-agent-team.json'), 'utf8'))

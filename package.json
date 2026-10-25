@@ -5,21 +5,25 @@
   "type": "module",
   "private": true,
   "exports": {
+    "./host": "./src/host.mjs",
     "./roles": "./src/roles/index.mjs",
     "./bridge": "./src/bridge/index.mjs",
-    "./auth": "./src/auth/provider.mjs"
+    "./auth": "./src/auth/provider.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml"
   },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
   "engines": { "node": ">=24.9.0" },
   "bin": { "dsh-agent-team-mcp": "./src/mcp/main.mjs" },
   "scripts": {
     "test": "npm run test:unit",
     "test:unit": "node --test test/auth/*.test.mjs test/bridge/*.test.mjs test/mcp/*.test.mjs test/roles/*.test.mjs test/native/synthetic-fixtures.test.mjs",
-    "test:native": "node --test test/native/shared-session.test.mjs",
+    "test:native": "node --test test/native/shared-session.test.mjs test/native/validation-scope.test.mjs",
     "check": "node scripts/check.mjs",
     "build": "node scripts/build.mjs",
     "pack:check": "npm pack --dry-run --ignore-scripts",
-    "runtime:prepare": "node scripts/runtime/prepare.mjs",
+    "runtime:connect": "node scripts/runtime/connect.mjs",
+    "test:runtime": "node --test test/runtime/*.test.mjs",
     "runtime:verify": "node scripts/runtime/verify.mjs"
   },
-  "files": ["src", "scripts", "docs", "skills", "plugin.json", "mcp.json", "runtime-lock.json", "PLAN.md", "README.md", "LICENSE"]
+  "files": ["src", "scripts", "docs", "skills", "examples", "cordis.patch.yml", "plugin.json", "mcp.json", "runtime-lock.json", "PLAN.md", "README.md", "LICENSE", "test/fixtures/audit.mjs", "test/fixtures/synthetic-files.mjs", "test/native/README.md"]
 }

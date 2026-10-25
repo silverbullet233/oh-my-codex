@@ -8,12 +8,13 @@ function fixture() {
   const roles = { async bindings() { return []; }, catalog() { return { roles: [] }; } };
   const observation = initialBridgeState();
   const agents = new Map();
+  const children = new Map();
   const projection = { kind: 'sequenced', asOfSeq: 1, values: { dshBridge: observation, agentTeam: { members: [{ id: 'root', name: 'lead', role: 'lead' }, { id: 'child', name: 'worker', role: 'teammate' }], tasks: [] }, inbox: { 'next-turn': [], 'next-step': [] }, modelSelection: { lastUsed: { provider: 'observed', model: 'actual' } } } };
   const ctx = {
     connection: { createPeer(options) { calls.push(['peer', options]); return { dispose: async () => calls.push(['peer-disposed']) }; } },
     typertGateway: { invoke(request) {
       calls.push([request.method, request.args.request]);
-      return request.method === 'projections' ? structuredClone(projection) : { accepted: true };
+      return request.method === 'projections' ? structuredClone(request.args.request.sessionId === 'root' ? projection : children.get(request.args.request.sessionId) ?? null) : { accepted: true };
     } },
     sessionController: {}, sessions: { get() { return {}; }, async flush() { calls.push(['flush']); } },
     agents: { get(id) { return agents.get(id); } }, sessionProjections: {},
@@ -22,7 +23,7 @@ function fixture() {
       interrupt(lead, name) { calls.push(['interrupt', lead.id, name]); },
     },
   };
-  return { port: new NativeSessionPort(ctx, roles), calls, agents, observation, projection };
+  return { port: new NativeSessionPort(ctx, roles), calls, agents, children, observation, projection };
 }
 
 test('healthy active native turn accepts queue/steer without explicit continuation', async () => {
@@ -86,4 +87,47 @@ test('stop interrupts native children through Team authority and cancels lead th
   assert.equal(result.filesRolledBack, false);
   assert.equal(result.pendingInputsRetained, true);
   assert.deepEqual(calls[0], ['peer', { principal: { kind: 'owner' }, interactions: 'none' }]);
+});
+
+test('native inactive unloaded children with durable completion and empty inbox allow Team completion without activation', async () => {
+  const { port, agents, children, observation, calls } = fixture();
+  observation.lastEnd = { turn: 1, reason: 'completed' };
+  agents.set('root', { id: 'root', status: 'idle', model: { current: () => undefined } });
+  children.set('child', { kind: 'sequenced', asOfSeq: 7, values: {
+    dshBridge: { ...initialBridgeState(), lastEnd: { turn: 1, reason: 'completed' } },
+    inbox: { 'next-turn': [], 'next-step': [] },
+  } });
+  const status = await port.snapshot('root');
+  assert.equal(status.teamCompleted, true);
+  assert.equal(status.taskState, 'completed');
+  const child = status.teamActivity.members.find(member => member.id === 'child');
+  assert.equal(child.runtimeState, 'unloaded');
+  assert.equal(child.nativeStatus, 'inactive');
+  assert.equal(child.lastTurnOutcome, 'completed');
+  assert.equal(child.openTurn, false);
+  assert.equal(child.observationAvailable, true);
+  assert.equal(agents.has('child'), false);
+  assert.deepEqual(calls.filter(call => call[0] !== 'peer').map(call => call[0]), ['projections', 'projections']);
+  agents.delete('root');
+  const cold = await port.snapshot('root');
+  assert.equal(cold.teamCompleted, null);
+  assert.equal(cold.taskState, 'unknown');
+});
+
+test('an inactive child open turn cannot reuse an earlier completed outcome as Team completion', async () => {
+  const { port, agents, children, observation } = fixture();
+  observation.lastEnd = { turn: 1, reason: 'completed' };
+  agents.set('root', { id: 'root', status: 'idle', model: { current: () => undefined } });
+  children.set('child', { kind: 'sequenced', asOfSeq: 9, values: {
+    dshBridge: { ...initialBridgeState(), turn: 2, open: true, lastEnd: { turn: 1, reason: 'completed' } },
+    inbox: { 'next-turn': [], 'next-step': [] },
+  } });
+  const status = await port.snapshot('root');
+  assert.equal(status.rootTurnCompleted, true);
+  assert.equal(status.teamCompleted, false);
+  assert.equal(status.taskState, 'interrupted');
+  const child = status.teamActivity.members.find(member => member.id === 'child');
+  assert.equal(child.nativeStatus, 'inactive');
+  assert.equal(child.openTurn, true);
+  assert.equal(child.lastTurnOutcome, 'completed');
 });

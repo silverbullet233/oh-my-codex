@@ -1,7 +1,7 @@
 import { appendFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-export const nativeTeamTools = new Set(['spawn_teammate', 'spawn_role_teammate', 'list_agents', 'send_message', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update']);
+export const nativeTeamTools = new Set(['spawn_teammate', 'spawn_role_teammate', 'list_agents', 'send_message', 'wait_agent', 'interrupt_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update']);
 export const fixtureTools = new Set(['fixture_read', 'fixture_write']);
 
 /** Persist the entire model-visible payload before permitting a synthetic call. */
@@ -11,7 +11,8 @@ export function createSyntheticAuditor({ auditPath, maxRequests = 24, maxPayload
     if (++requests > maxRequests) throw new Error('Synthetic request limit exceeded.');
     const declaredTools = [...(options.tools ?? []), ...(options.toolHistory?.tools ?? []), ...(options.toolHistory?.updates ?? []).flatMap((update) => update.additions)];
     const toolNames = declaredTools.map((tool) => tool.name);
-    if (toolNames.some((name) => !nativeTeamTools.has(name) && !fixtureTools.has(name))) throw new Error('A non-allowlisted tool reached the synthetic model payload.');
+    const denied = toolNames.filter(name => !nativeTeamTools.has(name) && !fixtureTools.has(name));
+    if (denied.length) throw new Error(`A non-allowlisted tool reached the synthetic model payload: ${[...new Set(denied)].join(', ')}`);
     const payload = { system: options.system, messages: options.messages, tools: options.tools, toolHistory: options.toolHistory, temperature: options.temperature, maxTokens: options.maxTokens, stop: options.stop };
     for (const message of payload.messages) {
       for (const block of message.content) {

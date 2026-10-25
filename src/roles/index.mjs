@@ -7,6 +7,7 @@ import { resolveConfig, memberName, text, inputDigest, routeOf } from './config.
 import { RESERVED, BOUND, initialState, foldRoleState, foldRoleEvents, needsInitialSelection } from './state.mjs';
 import { LeadStore } from './lead-store.mjs';
 import { disposeContributions } from './lifecycle.mjs';
+import { creationGuard } from './admission.mjs';
 
 const bindingSchema = z.object({
   name: z.string(), role: z.string(), description: z.string(), instructions: z.string(),
@@ -26,8 +27,28 @@ const roleProjection = {
   apply: foldRoleState,
   wire: { viewSchema: stateSchema, summary: false, view: state => state },
 };
-const creationGuard = exec => ['spawn_teammate', 'spawn_agent', 'fork_agent', 'subagent', 'subagent_fork', 'activate_agent', 'resume_agent'].includes(exec.name)
-  ? 'This Team requires an allowlisted role through spawn_role_teammate.' : undefined;
+const watchedParents = new WeakSet();
+
+function isLocalSubagent(ctx, agent, parent) {
+  return agent.session.header.origin === 'subagent'
+    || (parent !== undefined && ctx.agents.isOwnedBy(agent.id, parent));
+}
+
+/** Keep native child admission closed while the role service is being replaced. */
+function watchChildAdmission(parent) {
+  if (watchedParents.has(parent)) return;
+  const ownerCtx = parent.ctx;
+  ownerCtx.on('agent/created', ({ agent }) => {
+    if (agent.session.header.parentSession !== parent.id || ownerCtx.agents.get(parent.id) !== parent) return undefined;
+    if (!isLocalSubagent(ownerCtx, agent, parent)) return undefined;
+    const current = ownerCtx.get('dshRoles');
+    if (current === undefined || typeof current.isReady !== 'function' || !current.isReady()) {
+      throw new Error('managed role service is unavailable during native child creation');
+    }
+    return undefined;
+  }, { global: true, prepend: true });
+  watchedParents.add(parent);
+}
 
 /** Service loaded in the same native host as SessionController, Agent Teams, and Web. */
 export class DshRoles extends Service {
@@ -42,6 +63,7 @@ export class DshRoles extends Service {
     this.installing = new Map();
     this.uninstalling = new Map();
     this.lifecycle = new AbortController();
+    this.ready = false;
     ctx.effect(() => async () => {
       this.lifecycle.abort(new Error('role policy is unloading'));
       await Promise.allSettled([...this.tails.values(), ...this.installing.values()]);
@@ -62,7 +84,11 @@ export class DshRoles extends Service {
     });
     this.ctx.on('agent/disposed', ({ agent }) => this.uninstall(agent));
     for (const agent of this.ctx.agents.list()) await this.install(agent);
+    this.ready = true;
   }
+
+  /** Admission watchers use the current service instance across native HMR replacements. */
+  isReady() { return this.ready && !this.lifecycle.signal.aborted; }
 
   /** Store the Lead profile before the bridge calls native session.create. */
   async prepareLead(sessionId, roleName) {
@@ -102,9 +128,22 @@ export class DshRoles extends Service {
     if (lead !== null) return lead;
     const rootId = agent.session.header.parentSession;
     if (rootId === undefined) return null;
+    const parent = this.ctx.agents.get(rootId);
+    const membership = this.ctx.agentTeams.tryMembership(agent);
+    // Native SessionController uses origin or exact runtime ownership to
+    // distinguish delegated children from independent Web forks.
+    const localSubagent = isLocalSubagent(this.ctx, agent, parent);
+    if (!localSubagent && membership?.role !== 'teammate') return null;
     const root = this.ctx.sessions.get(rootId);
     const rootState = root === undefined ? await this.coldState(rootId) : this.projection.stateOf(root);
-    return rootState.reservations.find(binding => binding.memberId === agent.id) ?? null;
+    const binding = rootState.reservations.find(candidate => candidate.memberId === agent.id) ?? null;
+    if (rootState.bound !== null && binding === null) {
+      throw new Error('native subagent under a managed parent has no durable role reservation');
+    }
+    if (binding !== null && (membership?.role !== 'teammate' || membership.root.id !== rootId)) {
+      throw new Error('durable role reservation does not match native Team membership');
+    }
+    return binding;
   }
 
   /** Awaited by serial agent/created before native queued work can run. */
@@ -138,6 +177,7 @@ export class DshRoles extends Service {
       // This Agent-owned monotonic policy survives role-service reloads. Removing
       // the enhanced tool must never reopen native unrestricted creation.
       agent.ctx.tools.guard(creationGuard);
+      watchChildAdmission(agent);
       if (binding.name === 'lead') this.installSpawn(agent, disposers);
       await this.ctx.sessions.flush(agent.session);
       signal.throwIfAborted();

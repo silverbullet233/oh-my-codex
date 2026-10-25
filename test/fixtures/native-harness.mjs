@@ -79,13 +79,14 @@ export async function mountNativeHost({ root, roles = fixtureRoles, respond = ()
     const output = { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] };
     ctx.effect(() => ctx.tools.register(tools.defineTool({ name: 'fixture_read', description: 'Read one allowlisted short synthetic fixture file.', parameters: { name: { type: 'string', required: true, enum: ['nonce.txt', 'left.txt', 'right.txt', 'left-result.txt', 'right-result.txt'] } }, output, execute: (args) => files.read(args.name) })));
     ctx.effect(() => ctx.tools.register(tools.defineTool({ name: 'fixture_write', description: 'Write at most 256 bytes to one allowlisted synthetic result file.', parameters: { name: { type: 'string', required: true, enum: ['left-result.txt', 'right-result.txt'] }, text: { type: 'string', required: true } }, output, execute: async (args) => JSON.stringify(await files.write(args.name, args.text)) })));
-    await ctx.plugin(rolesPlugin.default, { stateDirectory: join(root, 'role-state'), leadRole: 'lead', spawnProvider: 'spawn', roles });
+    const roleConfig = { stateDirectory: join(root, 'role-state'), leadRole: 'lead', spawnProvider: 'spawn', roles };
+    const roleFiber = await ctx.plugin(rolesPlugin.default, roleConfig);
     await ctx.plugin(storage.default);
     await ctx.plugin(storageJson, { root: join(root, 'storage') });
     await ctx.plugin(storageDomain, { backend: 'json', routes: {} });
     await ctx.plugin(workspace.default);
     ctx.provide('agentDefaultModel', { currentSelection: () => ({ provider: 'fixture-lead', model: 'fixture-model', reasoningEffort: 'max' }), saveSelection: () => { throw new Error('Role routing must not save a global default.'); } });
-    ctx.provide('attachments', { imageLimits: { maxMessageImageBytes: 1024 }, admitPromptContent: async (content) => { if (content.some((part) => part.type !== 'text')) throw new Error('Synthetic fixture is text-only.'); return content; } });
+    ctx.provide('attachments', { imageLimits: { maxImageBytes: 1024, maxImagesPerMessage: 1, maxMessageImageBytes: 1024, maxImagePixels: 1024, maxImageDimension: 32, mediaTypes: ['image/png'] }, admitPromptContent: async (content) => { if (content.some((part) => part.type !== 'text')) throw new Error('Synthetic fixture is text-only.'); return content; } });
     ctx.provide('fileUploads', { registerAgentResolver: () => () => {}, resolve: () => undefined, bindPrompt: () => ({ commit() {}, [Symbol.dispose]() {} }), retirePrompt() {} });
     // This fixed record is confined to memory and is never exported, persisted or used in a browser.
     const existingFixtureRecord = { kind: 'grant', payload: { version: 1, secret: Buffer.alloc(32, 19).toString('base64url') } };
@@ -99,8 +100,12 @@ export async function mountNativeHost({ root, roles = fixtureRoles, respond = ()
     await ctx.plugin(controller.default, { nativeOpen: false });
     const socketPath = join(root, 'bridge.sock');
     if (bridge) await ctx.plugin(bridgePlugin, { stateDirectory: join(root, 'bridge-state'), socketPath, allowedRoots: [fixtureRoot], sourceSha: pinnedSha });
+    else {
+      const [{ z }, { bridgeProjectionDefinition }] = await Promise.all([import('zod'), import('../../src/bridge/projection.mjs')]);
+      await ctx.sessionProjections.register(bridgeProjectionDefinition(z));
+    }
     const clientModule = await import('../../src/bridge/client.mjs');
-    return { ctx, root, fixtureRoot, files, auditPath, requests, socketPath, client: new clientModule.BridgeClient({ socketPath }), dispose: () => ctx.fiber.dispose() };
+    return { ctx, root, fixtureRoot, files, auditPath, requests, socketPath, roleFiber, rolePlugin: rolesPlugin.default, roleConfig, client: new clientModule.BridgeClient({ socketPath }), dispose: () => ctx.fiber.dispose() };
   } catch (error) {
     await ctx.fiber.dispose();
     throw error;

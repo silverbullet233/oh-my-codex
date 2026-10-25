@@ -53,12 +53,14 @@ export class NativeSessionPort {
       const native = liveRoster?.find(row => row.id === member.id);
       const live = this.ctx.agents.get(member.id);
       let current = member.id === sessionId ? projections : null;
-      if (member.id !== sessionId && live !== undefined) current = await this.projections(member.id);
+      if (member.id !== sessionId) current = await this.projections(member.id);
       const pending = current?.kind === 'sequenced' ? current.values.inbox : null;
       members.push({
         id: member.id, name: member.name, role: member.role, phase: member.phase,
         nativeStatus: native?.status ?? null,
         runtimeState: live?.status ?? 'unloaded',
+        observationAvailable: current?.kind === 'sequenced' && current.values.dshBridge !== undefined && current.values.inbox !== undefined,
+        openTurn: current?.kind === 'sequenced' ? current.values.dshBridge?.open ?? null : null,
         pendingInputs: pending === null || pending === undefined ? null : (pending['next-turn']?.length ?? 0) + (pending['next-step']?.length ?? 0),
         lastTurnOutcome: current?.kind === 'sequenced' ? current.values.dshBridge?.lastEnd?.reason ?? null : null,
       });
@@ -68,11 +70,12 @@ export class NativeSessionPort {
     const provisioning = members.some(member => member.phase === 'provisioning' || member.nativeStatus === 'provisioning');
     const failed = team?.failure !== undefined || members.some(member => member.phase === 'failed' || member.nativeStatus === 'failed');
     const pending = queued || pendingTasks > 0 || members.some(member => (member.pendingInputs ?? 0) > 0);
-    const unknown = agent === undefined || team === null || liveRoster === null || members.some(member => member.runtimeState === 'unloaded' || member.pendingInputs === null);
-    const childIncomplete = members.some(member => member.id !== sessionId && member.lastTurnOutcome !== 'completed');
+    const unknown = agent === undefined || team === null || liveRoster === null || members.some(member => member.nativeStatus === null || !member.observationAvailable);
+    const childInterrupted = members.some(member => member.id !== sessionId && member.openTurn === true && member.runtimeState !== 'running');
+    const childIncomplete = members.some(member => member.id !== sessionId && (member.openTurn === true || member.lastTurnOutcome !== 'completed'));
     const rootTurnCompleted = rootTurnState === 'completed';
     const teamCompleted = active || provisioning || failed || pending || !rootTurnCompleted ? false : unknown ? null : !childIncomplete;
-    const activityState = active ? 'running' : provisioning ? 'provisioning' : failed ? 'failed' : pending ? 'pending' : unknown ? 'unknown' : childIncomplete ? 'incomplete' : 'quiescent';
+    const activityState = active ? 'running' : provisioning ? 'provisioning' : failed ? 'failed' : pending ? 'pending' : unknown ? 'unknown' : childInterrupted ? 'interrupted' : childIncomplete ? 'incomplete' : 'quiescent';
     return {
       sessionId,
       asOfSeq: projections.asOfSeq,
