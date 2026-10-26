@@ -9,6 +9,6 @@ Create uses a durable caller key and native Session ID. Reuse the same key only 
 
 Use native DSH Web for member sessions, tasks, messages, tools and approvals. Never approve on the user's behalf, select arbitrary provider endpoints or replace the native UI. Stop cancels execution; it does not undo file changes. Report configured, selected and last-request routes separately; unknown usage and fees remain unknown.
 
-Role names must come from the host's configured allowlist. Each new member receives a durable immutable role snapshot; later role configuration changes apply only to new members. The initial integration accepts text input only. Do not describe images or attachments as supported inputs.
+Inspect the host catalog before choosing a role. An empty catalog is supported: omit leadRole, let the Lead use the native main Agent model selection, and let native teammates inherit it. Do not invent roles, provider routes or reasoning settings. If explicit roles are configured, names must come from that allowlist; omitting leadRole uses the host's configured default. Managed members receive durable immutable role snapshots, and later catalog changes apply only to new members. Existing unmanaged native Teams stay unmanaged when roles are added. The integration accepts text input only; do not describe images or attachments as supported inputs.
 
 DSH is opt-in. Do not change Codex's ordinary entrypoint, model or subscription configuration.

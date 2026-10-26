@@ -2,13 +2,16 @@
 import { spawn } from 'node:child_process';
 import { readFile, writeFile, open } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { resolveSocketPath } from '../../src/bridge/socket-path.mjs';
 
 const project = resolve(import.meta.dirname, '../..');
-const run = JSON.parse(await readFile(process.argv[2] ?? '/tmp/dsh-team-native-live/run.json', 'utf8'));
+if (!process.argv[2]) throw new Error('Provide an explicitly authorized synthetic fixture run.json; this is not a default-host smoke test.');
+const run = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const reuseTeam = process.argv[3];
 if (reuseTeam !== undefined && !/^[a-f0-9-]{36}$/u.test(reuseTeam)) throw new Error('Expected an existing synthetic Team UUID.');
 const prefix = reuseTeam === undefined ? 'codex' : 'codex-reuse';
-const socketPath = `/tmp/dsh-agent-team-${process.getuid()}/native.sock`;
+const socketPath = resolveSocketPath();
+if (!socketPath) throw new Error('Set DSH_AGENT_TEAM_SOCKET to the existing synthetic validation host.');
 const expected = `${reuseTeam === undefined ? 'SYNTHETIC' : 'REUSE'}_${run.nonce}`;
 const answerPath = join(run.root, `${prefix}-answer.txt`);
 const env = { ...process.env };
@@ -40,7 +43,7 @@ for (const [key, value] of Object.entries({
 args.push('-C', run.fixtureRoot, '-o', answerPath, prompt);
 await writeFile(join(run.root, `${prefix}-request.json`), JSON.stringify({ model: 'gpt-6.1-sol', reasoningEffort: 'high', expected, cwd: run.fixtureRoot, socketPath, prompt, exactRequest, deadlineMs: 180000, maxMcpCalls: 12 }) + '\n', { mode: 0o600 });
 const log = await open(join(run.root, `${prefix}-events.jsonl`), 'w', 0o600);
-const child = spawn('/opt/homebrew/bin/codex', args, { cwd: run.fixtureRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
+const child = spawn(process.env.DSH_TEAM_CODEX_COMMAND ?? 'codex', args, { cwd: run.fixtureRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let bytes = 0;
 let pending = Promise.resolve();
 const deadline = setTimeout(() => child.kill('SIGTERM'), 180000);
