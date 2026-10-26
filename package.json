@@ -1,0 +1,36 @@
+{
+  "name": "dsh-agent-team",
+  "version": "0.2.0",
+  "description": "Independent explicit Codex MCP client for the native dsh-team-roles host",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./client": "./src/bridge/client.mjs"
+  },
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "bin": {
+    "dsh-agent-team-mcp": "./src/mcp/main.mjs"
+  },
+  "scripts": {
+    "test": "npm run test:unit",
+    "test:unit": "node --test test/mcp/*.test.mjs test/client/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs",
+    "pack:check": "npm pack --dry-run --ignore-scripts"
+  },
+  "files": [
+    "src",
+    "scripts/client.mjs",
+    "scripts/live/codex-e2e.mjs",
+    "scripts/build.mjs",
+    "scripts/check.mjs",
+    "skills",
+    "docs",
+    "plugin.json",
+    "mcp.json",
+    "README.md",
+    "LICENSE"
+  ]
+}
