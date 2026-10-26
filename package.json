@@ -1,36 +1,15 @@
 {
-  "name": "dsh-agent-team",
-  "version": "0.2.0",
-  "description": "Independent explicit Codex MCP client for the native dsh-team-roles host",
-  "type": "module",
+  "name": "oh-my-codex",
+  "version": "0.0.0",
   "private": true,
-  "exports": {
-    "./client": "./src/bridge/client.mjs"
-  },
-  "engines": {
-    "node": ">=24.9.0"
-  },
-  "bin": {
-    "dsh-agent-team-mcp": "./src/mcp/main.mjs"
-  },
+  "type": "module",
+  "description": "Repository catalog and development workspace for Codex plugins and standalone skills",
+  "engines": { "node": ">=24.9.0" },
+  "workspaces": ["plugins/*"],
   "scripts": {
-    "test": "npm run test:unit",
-    "test:unit": "node --test test/mcp/*.test.mjs test/client/*.test.mjs",
-    "check": "node scripts/check.mjs",
-    "build": "node scripts/build.mjs",
-    "pack:check": "npm pack --dry-run --ignore-scripts"
-  },
-  "files": [
-    "src",
-    "scripts/client.mjs",
-    "scripts/live/codex-e2e.mjs",
-    "scripts/build.mjs",
-    "scripts/check.mjs",
-    "skills",
-    "docs",
-    "plugin.json",
-    "mcp.json",
-    "README.md",
-    "LICENSE"
-  ]
+    "check": "node scripts/check-catalog.mjs && npm run check --workspaces --if-present",
+    "test": "node --test test/*.test.mjs && npm run test:unit --workspaces --if-present",
+    "build": "npm run check && npm run build --workspaces --if-present",
+    "pack:check": "npm run pack:check --workspaces --if-present"
+  }
 }

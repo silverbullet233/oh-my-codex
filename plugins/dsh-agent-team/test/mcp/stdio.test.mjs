@@ -8,7 +8,7 @@ import { serveFakeBridge as serveBridge } from '../fixtures/ipc-server.mjs';
 
 function run(socketPath, lines) {
   return new Promise((resolve_, reject) => {
-    const child = spawn(process.execPath, [resolve('src/mcp/main.mjs')], { env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: socketPath }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], { env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: socketPath }, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });
