@@ -1,0 +1,11 @@
+import { cp, mkdir, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { join, resolve } from 'node:path';
+const pluginRoot = resolve(import.meta.dirname, '..');
+const checked = spawnSync(process.execPath, [join(pluginRoot, 'scripts/check.mjs')], { stdio: 'inherit', cwd: pluginRoot });
+if (checked.status !== 0) process.exit(checked.status ?? 1);
+const target = join(pluginRoot, 'dist/dsh-agent-team');
+await rm(target, { recursive: true, force: true }); await mkdir(target, { recursive: true });
+const pkg = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'));
+for (const path of [...pkg.files, 'package.json']) await cp(join(pluginRoot, path), join(target, path), { recursive: true });
+console.log('Independent Codex MCP client assembled at ' + target);

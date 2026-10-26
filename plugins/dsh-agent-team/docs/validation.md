@@ -1,6 +1,6 @@
 # Client validation
 
-The repository split retains only a standalone Codex MCP/CLI client. The native package owns the original role/bridge/runtime/native tests and the new Settings tests. Earlier combined validation at commit `71e9f7a` reported 84 passing tests and synthetic dual-provider inference; that historical result is not a new live inference claim for this split.
+At the earlier repository split, this plugin retained only a standalone Codex MCP/CLI client. The native package owns the original role/bridge/runtime/native tests and the new Settings tests. Earlier combined validation at commit `71e9f7a` reported 84 passing tests and synthetic dual-provider inference; that historical result is not a new live inference claim for this split.
 
 The initial split client unit suite passed **17/17** tests. It covers MCP protocol/stdio, exact invocation-only request policies, private transport ownership, protocol/capability checks before work, EOF reconnection and error propagation. Build/package checks verify that the client package includes no native host, role implementation, runtime or cross-repository import. A packaged client can run from an isolated directory without DSH or node_modules and connect to the already running native host.
 
@@ -19,3 +19,13 @@ The current client unit suite passed **21/21** tests. New regressions verify tha
 The opt-in historical inference runner now requires an explicit synthetic fixture description and uses PATH/configured commands and the normal socket resolver. It was not run during this synchronization. No credentials or native profile settings were changed, no active Web host was restarted, and no paid inference was requested.
 
 Build and npm tarball inspection passed. The 18-file tarball was unpacked into an isolated temporary directory without `node_modules` or DSH imports in the client. Its CLI health and stdio MCP create/result requests succeeded against the actual 0.3.0 private IPC server module and protocol constants from the pinned host source, using a synthetic dispatch fixture and a nondefault `TMPDIR`. The create payload contained no injected role/provider/model. This verifies wire compatibility and packaged entrypoints, not native Session execution or model behavior; model requests were zero. Temporary sockets/processes were cleaned up.
+
+## Multi-plugin repository migration
+
+The plugin now lives at `plugins/dsh-agent-team/`. The root marketplace resolves its source relative to the repository root, while the portable plugin manifests and bundled skill stay inside the plugin. Root workspace scripts delegate plugin-specific checks; direct scripts and test subprocess paths resolve from their own files, not the caller's working directory.
+
+Repository checks validate discovery, missing MCP entrypoint rejection and a clean workspace lock without external developer links. The plugin suite adds a distribution regression that builds from an unrelated working directory, packs/unpacks the plugin without dependencies, then initializes MCP, discovers all six tools and reads fixture health from nested source, built folder and extracted tarball. These are synthetic IPC fixtures; they do not run the native host or model inference. Desktop plugin-browser refresh/import is documented but was not performed against the user's installed configuration.
+
+The migration suite passed 25 tests: three repository checks and 22 plugin tests. Workspace build and package inspection passed. The installed Codex CLI also successfully added/listed the local `oh-my-codex` marketplace using a disposable configuration directory, which was removed afterward; personal Codex configuration was not changed.
+
+The public native v0.3.0 Release asset and tag `99387ab241807dc5afedb937b4f83164b0504e5b` retain protocol 1 and the same socket behavior. The earlier test reference `058c7c4` above remains historical evidence. Repository layout changes require updating old direct source paths or refreshing marketplace discovery, not moving native Session data or role bindings.

@@ -30,7 +30,7 @@ test('CLI and MCP attach to the host default under a nondefault TMPDIR without a
     child.stdin.end(input);
     return ended;
   }
-  const cli = await run([resolve('scripts/client.mjs'), 'health']);
+  const cli = await run([resolve(import.meta.dirname, '../../scripts/client.mjs'), 'health']);
   assert.equal(cli.code, 0, cli.stderr);
   assert.equal(cli.stderr, '');
   assert.deepEqual(JSON.parse(cli.stdout).roles, { leadRole: '', roles: [] });
@@ -38,7 +38,7 @@ test('CLI and MCP attach to the host default under a nondefault TMPDIR without a
     { jsonrpc: '2.0', id: 1, method: 'initialize' },
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } },
   ].map(row => JSON.stringify(row)).join('\n') + '\n';
-  const mcp = await run([resolve('src/mcp/main.mjs')], input);
+  const mcp = await run([resolve(import.meta.dirname, '../../src/mcp/main.mjs')], input);
   assert.equal(mcp.code, 0, mcp.stderr);
   assert.equal(mcp.stderr, '');
   assert.equal(JSON.parse(mcp.stdout.trim().split('\n')[1]).result.structuredContent.ok, true);

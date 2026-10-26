@@ -1,0 +1,20 @@
+{
+  "name": "oh-my-codex",
+  "interface": {
+    "displayName": "Oh My Codex"
+  },
+  "plugins": [
+    {
+      "name": "dsh-agent-team",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dsh-agent-team"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

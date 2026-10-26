@@ -89,7 +89,7 @@ test('unsupported policy types and fields fail startup without disclosing policy
     assert.throws(() => createExactRequestClient(client, policy), { message: 'Invalid exact MCP request policy.' });
   }
   for (const policy of ['not-json-synthetic-secret', JSON.stringify({ method: 'stop', params: { teamId: 'synthetic-secret' } })]) {
-    const result = spawnSync(process.execPath, [resolve('src/mcp/main.mjs')], { env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: '/private/tmp/intentionally-absent.sock', DSH_AGENT_TEAM_MCP_REQUEST_POLICY: policy }, input: '', encoding: 'utf8' });
+    const result = spawnSync(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], { env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: '/private/tmp/intentionally-absent.sock', DSH_AGENT_TEAM_MCP_REQUEST_POLICY: policy }, input: '', encoding: 'utf8' });
     assert.equal(result.status, 1);
     assert.equal(result.stdout, '');
     assert.equal(result.stderr, 'Invalid exact MCP request policy.\n');
@@ -102,7 +102,7 @@ test('stdio applies a valid invocation policy before a wrong request can reach i
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_create', arguments: { ...create, cwd: '/private/tmp/wrong-fixture' } } },
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_result', arguments: { teamId: nativeTeam } } },
   ];
-  const result = spawnSync(process.execPath, [resolve('src/mcp/main.mjs')], {
+  const result = spawnSync(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], {
     env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: '/private/tmp/intentionally-absent.sock', DSH_AGENT_TEAM_MCP_REQUEST_POLICY: JSON.stringify({ method: 'create', params: create }) },
     input: requests.map(request => JSON.stringify(request)).join('\n') + '\n', encoding: 'utf8',
   });
