@@ -4,6 +4,8 @@ An independent, explicit **Codex MCP/CLI client** extending the standalone nativ
 
 This self-contained plugin lives at `plugins/dsh-agent-team/` in the [Oh My Codex collection](https://github.com/silverbullet233/oh-my-codex). Run the commands below from this plugin directory, or from the root of its extracted package. The repository marketplace points here; it does not install the collection root as a plugin.
 
+Start with the [getting-started guide](docs/getting-started.md) for native Web setup, Codex installation, a first task and follow-ups on the same Lead.
+
 ## Native host requirement
 
 Install and run the separately versioned [dsh-team-roles 0.3.0 Release](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.3.0) in the existing native DSH Web profile first. Use its **built versioned tarball**:
