@@ -30,7 +30,7 @@ dsh plugin --profile web add /absolute/path/to/dsh-team-roles-0.4.0.tgz --ignore
 
 Replace the placeholder with the actual locally built 0.4.0 candidate tarball. **0.4.0 is not yet a published release.** This command initializes the Web profile if needed and adds the role bundle. Do not substitute the published [0.3.0 asset](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.3.0) or a Git source archive. A compatible public tarball URL will be documented after validation and publication; none is implied here.
 
-These commands manage the Web profile's installed dependencies and ordered bundles. The official Team profile enables `agent-team`, `tool-agent-team` and `ui-agent-team`; the default Web profile alone does not enable them. It must follow the base bundle and precede `dsh-team-roles`. Existing profile dependencies and other bundle choices should be preserved. All entries resolve through the same native runtime/profile resolver, without manual dependency links or manifest replacement. See the candidate's [runtime requirements](https://github.com/silverbullet233/dsh-team-roles/blob/4940048a844c13aad81c31668f9994ff7387ad05/docs/runtime.md).
+These commands manage the Web profile's installed dependencies and ordered bundles. The official Team profile enables `agent-team`, `tool-agent-team` and `ui-agent-team`; the default Web profile alone does not enable them. It must follow the base bundle and precede `dsh-team-roles`. Existing profile dependencies and other bundle choices should be preserved. All entries resolve through the same native runtime/profile resolver, without manual dependency links or manifest replacement. See the candidate's [runtime requirements](https://github.com/silverbullet233/dsh-team-roles/blob/303eef006c75a45270a2d3f55b6a5842d4de2512/docs/runtime.md).
 
 ## 3. Start Web from the intended workspace
 
@@ -73,11 +73,13 @@ Ask Codex:
 
 ```text
 Use dsh-agent-team. Call dsh_team_health only. Report whether the native host is
-ready, its reported runtime identity, protocol/capabilities and available roles. Do not create
-a task or start another host.
+ready, runtime.packageVersion, protocol/capabilities and available roles.
+Do not create a task or start another host.
 ```
 
 Expect `ok: true`, protocol name `dsh-team-roles`, version `1`, and capabilities `native-session`, `durable-role-snapshots`, `native-role-settings`, `text-input`, `idempotent-admission`. An empty role catalog is valid. The client refuses incompatible capabilities before submitting work.
+
+The released runtime is identified by `health.runtime.packageVersion`, expected to be `0.2.2-alpha.2`. Its `health.sourceSha` is `null`; this is normal for the npm runtime and does not indicate a failed source build. Runtime/API/service-identity checks are performed by the native host.
 
 For direct diagnostics, run `node scripts/client.mjs health` **from this plugin's root** in a checkout or extracted package; from the collection root use `node plugins/dsh-agent-team/scripts/client.mjs health`. This is an optional diagnostic, not another server.
 
