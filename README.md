@@ -25,13 +25,7 @@ node plugins/dsh-agent-team/scripts/client.mjs health
 node plugins/dsh-agent-team/src/mcp/main.mjs
 ```
 
-The DSH client needs an existing compatible native host. Install the separately published native host package with:
-
-```sh
-dsh plugin --profile web add 'https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.3.0/dsh-team-roles-0.3.0.tgz' --ignore-scripts
-```
-
-This is a [GitHub Release asset](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.3.0); it does not imply an npm publication. Native runtime requirements, explicit role behavior and socket overrides are documented in the [plugin README](plugins/dsh-agent-team/README.md).
+The DSH client needs an existing compatible native host. Use the exact npm runtime `@deepseek-ai/dsh@0.2.2-alpha.2` with the unreleased local `dsh-team-roles` **0.4.0 candidate**. Upstream local keyless and standalone-installation checks passed; the adaptation remains under review in [dsh-team-roles PR #4](https://github.com/silverbullet233/dsh-team-roles/pull/4). The published host 0.3.0 remains source-locked and does not support that runtime. See the [current compatibility and setup instructions](plugins/dsh-agent-team/docs/getting-started.md). The Codex client itself needs no DSH source checkout or runtime dependencies.
 
 ## Layout and development
 
