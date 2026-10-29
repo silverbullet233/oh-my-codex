@@ -6,11 +6,11 @@ import { join } from 'node:path';
 import { BridgeClient } from '../../src/bridge/client.mjs';
 import { serveFakeBridge, contract } from '../fixtures/ipc-server.mjs';
 import { createDispatcher } from '../../src/mcp/server.mjs';
-async function fixture(t, { catalog, createError, ...options } = {}) {
+async function fixture(t, { catalog, createError, healthResult, ...options } = {}) {
   const root=await mkdtemp(join(tmpdir(),'dsh-client-'));const socketPath=join(root,'ipc.sock');const calls=[];
   const server=await serveFakeBridge({socketPath,bridge:{dispatch:async(method,params)=>{
     calls.push({method,params});
-    if(method==='health')return {ok:true,...(catalog===undefined?{}:{roles:catalog})};
+    if(method==='health')return {ok:true,...healthResult,...(catalog===undefined?{}:{roles:catalog})};
     if(method==='create' && createError)throw createError;
     return {accepted:true};
   }},...options});
@@ -23,6 +23,20 @@ test('independent client handshakes capabilities before a write and retains exac
   const params={key:'synthetic',cwd:'/synthetic',text:'Synthetic standalone client input.'};
   assert.equal((await client.request('create',params)).accepted,true);
   assert.deepEqual(calls,[{method:'health',params:{}},{method:'create',params}]);
+});
+test('MCP preserves released runtime package identity with null sourceSha and admits compatible work', async t => {
+  const evidence = { sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.2' } };
+  const { client, calls } = await fixture(t, { healthResult: evidence });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const health = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } });
+  assert.equal(health.result.structuredContent.sourceSha, null);
+  assert.equal(health.result.structuredContent.runtime.packageVersion, '0.2.2-alpha.2');
+  assert.deepEqual(health.result.structuredContent.protocol, contract);
+  const params = { key: 'released-runtime', cwd: '/synthetic', text: 'Synthetic release runtime input.' };
+  const created = await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_create', arguments: params } });
+  assert.equal(created.result.structuredContent.accepted, true);
+  assert.deepEqual(calls.filter(call => call.method === 'create'), [{ method: 'create', params }]);
 });
 test('missing native capabilities refuse work before create dispatch',async t=>{
   const {client,calls}=await fixture(t,{health:{...contract,capabilities:['native-session']}});

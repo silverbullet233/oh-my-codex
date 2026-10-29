@@ -4,44 +4,33 @@
 
 ## 1. Check the prerequisites
 
-- Node.js **>=24.9.0**, a compatible local Codex client, and DSH running as the same OS user. UID-owned Unix sockets are required; macOS is validated, Windows is not established.
-- The complete official DSH source build at **`22ddee3792402c3e70ec5f86a63c3e3e895a2f60`**, including matching Web artifacts, native `agent.model.select/current` and durable selection. Follow the [official source-run instructions at that commit](https://github.com/deepseek-ai/deepseek-harness/blob/22ddee3792402c3e70ec5f86a63c3e3e895a2f60/apps/cli/README.md#development). The released `dsh-v0.2.1-rc.3` tag at `1f81c047fc48fa190a683e469daa699857e9afe8` lacks these APIs despite the same version string. Other source commits and newer releases need separate compatibility verification.
+- Node.js satisfying the installed DSH runtime's requirements and this client's **>=24.9.0** minimum, a compatible local Codex client, and DSH running as the same OS user. UID-owned Unix sockets are required; macOS is validated, Windows is not established.
+- The exact official npm runtime **`@deepseek-ai/dsh@0.2.2-alpha.2`**, which supplies native `agent.model.select/current` and durable selection. No DSH source checkout or source build is needed for this release-runtime path. rc.3/rc.4 lack the required APIs; other versions need separate compatibility verification.
+- The **unreleased local `dsh-team-roles` 0.4.0 candidate**. Upstream's 88 local keyless tests and standalone tarball installation/loading checks passed on the npm runtime. The adaptation is under review in [upstream PR #4](https://github.com/silverbullet233/dsh-team-roles/pull/4). The existing published **0.3.0** host is source-locked and is not compatible with alpha.2.
 - Existing native provider registrations and authentication for the model you intend to use. Select a working native main Agent model in Web before the first task.
 
-Use `command -v dsh` to check which launcher your terminal resolves. A matching `dsh --version` alone does not establish API or build compatibility. Native host version **0.3.0**, Codex client **0.2.0**, and IPC protocol **1** are separate versions.
+When installing the runtime, use its exact npm version rather than a moving tag:
+
+```sh
+npm install -g @deepseek-ai/dsh@0.2.2-alpha.2
+```
+
+Coordinate any replacement of an existing runtime with its active work. Use `command -v dsh` and `dsh --version` to check the launcher your terminal resolves. The native plugin also checks APIs and shared service identities at activation. The host package version, Codex client **0.2.0**, and IPC protocol **1** are separate versions.
 
 ## 2. Install the DSH plugin and enable native Teams
 
 Perform profile installation/edits while the host is stopped, or coordinate native reload with its active work. Do not start a second writer against the same Session store or IPC socket.
 
-Install the built GitHub Release asset through the compatible DSH launcher:
+Enable the exact official Team profile first if it is not already active, then install the **locally built 0.4.0 tarball** through the alpha.2 launcher:
 
 ```sh
-dsh plugin --profile web add \
-  'https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.3.0/dsh-team-roles-0.3.0.tgz' \
-  --ignore-scripts
+dsh plugin --profile web add @deepseek-ai/dsh-experimental-agent-team-profile@0.2.2-alpha.2 --ignore-scripts
+dsh plugin --profile web add /absolute/path/to/dsh-team-roles-0.4.0.tgz --ignore-scripts
 ```
 
-This initializes the Web profile if needed and adds the role bundle. It is a [GitHub Release](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.3.0), not an npm publication or a source archive. No development-directory links or second registry DSH runtime are required.
+Replace the placeholder with the actual locally built 0.4.0 candidate tarball. **0.4.0 is not yet a published release.** This command initializes the Web profile if needed and adds the role bundle. Do not substitute the published [0.3.0 asset](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.3.0) or a Git source archive. A compatible public tarball URL will be documented after validation and publication; none is implied here.
 
-Enable the official **`@deepseek-ai/dsh-experimental-agent-team-profile`** bundle in the Web profile's `package.json`: `$DSH_HOME/profiles/web/package.json`, or `~/.dsh/profiles/web/package.json` when `DSH_HOME` is unset. Preserve its dependencies and any other bundles. Add the Team bundle after base and before `dsh-team-roles`; the relevant portion is:
-
-```json
-{
-  "dsh": {
-    "profile": {
-      "bundles": [
-        "@deepseek-ai/dsh-base",
-        "@deepseek-ai/dsh-web-app",
-        "@deepseek-ai/dsh-experimental-agent-team-profile",
-        "dsh-team-roles"
-      ]
-    }
-  }
-}
-```
-
-The compatible complete source runtime supplies the official Team bundle through DSH's profile resolver. That bundle enables `agent-team`, `tool-agent-team` and `ui-agent-team`; the default Web profile alone does not enable them. Do not replace the whole profile manifest with the fragment above. See the [native runtime requirements](https://github.com/silverbullet233/dsh-team-roles/blob/v0.3.0/docs/runtime.md).
+These commands manage the Web profile's installed dependencies and ordered bundles. The official Team profile enables `agent-team`, `tool-agent-team` and `ui-agent-team`; the default Web profile alone does not enable them. It must follow the base bundle and precede `dsh-team-roles`. Existing profile dependencies and other bundle choices should be preserved. All entries resolve through the same native runtime/profile resolver, without manual dependency links or manifest replacement. See the candidate's [runtime requirements](https://github.com/silverbullet233/dsh-team-roles/blob/303eef006c75a45270a2d3f55b6a5842d4de2512/docs/runtime.md).
 
 ## 3. Start Web from the intended workspace
 
@@ -84,11 +73,13 @@ Ask Codex:
 
 ```text
 Use dsh-agent-team. Call dsh_team_health only. Report whether the native host is
-ready, its source SHA, protocol/capabilities and available roles. Do not create
-a task or start another host.
+ready, runtime.packageVersion, protocol/capabilities and available roles.
+Do not create a task or start another host.
 ```
 
 Expect `ok: true`, protocol name `dsh-team-roles`, version `1`, and capabilities `native-session`, `durable-role-snapshots`, `native-role-settings`, `text-input`, `idempotent-admission`. An empty role catalog is valid. The client refuses incompatible capabilities before submitting work.
+
+The released runtime is identified by `health.runtime.packageVersion`, expected to be `0.2.2-alpha.2`. Its `health.sourceSha` is `null`; this is normal for the npm runtime and does not indicate a failed source build. Runtime/API/service-identity checks are performed by the native host.
 
 For direct diagnostics, run `node scripts/client.mjs health` **from this plugin's root** in a checkout or extracted package; from the collection root use `node plugins/dsh-agent-team/scripts/client.mjs health`. This is an optional diagnostic, not another server.
 
@@ -141,7 +132,7 @@ To use explicit roles, add descriptions, instructions, existing provider/model I
 | MCP tools are absent | Check `codex plugin list --marketplace oh-my-codex --json`, installation/enabled state, and start a new session. Use `/plugins` to inspect the configured source. |
 | Web works, but IPC/health is missing | Inspect native plugin activation diagnostics and the profile's ordered bundles. Both the official Team bundle and `dsh-team-roles` must activate in that same host. The client does not start them. |
 | `ENOENT`, `ECONNREFUSED`, or a socket-path mismatch | The default is `path.join(os.tmpdir(), 'dsh-agent-team-<uid>', 'native.sock')`. Compare the host's actual `socketPath`, OS user and temporary-directory environment with the MCP process. On macOS, do not assume `/tmp`. For a custom/legacy socket, ensure the MCP server receives `DSH_AGENT_TEAM_SOCKET` with that exact private socket path; direct CLI diagnostics can receive the same variable. Do not probe another host or loosen permissions. |
-| `DSH_NATIVE_PEERS_UNAVAILABLE` or `DSH_RUNTIME_INCOMPATIBLE` | Use the complete compatible source-built launcher and matching Web artifacts/profile resolver. Do not rely on rc.3 version text, install a second native runtime, or substitute old frontend assets. |
+| `DSH_NATIVE_PEERS_UNAVAILABLE` or `DSH_RUNTIME_INCOMPATIBLE` | Check the exact npm runtime version, adapted host build and native Team bundle resolution. The published host 0.3.0 is not the alpha.2 adaptation. Do not fall back to rc.3/rc.4, create manual dependency links or mix native service instances. |
 | Provider/model is unavailable, or sign-in is required | Check the exact native registration, model ID and supported effort in Web. Launch from the shell that initializes existing provider variables, or use native sign-in/settings. Do not put keys in roles or change provider/model to conceal a failure. |
 | Workspace rejected | `cwd` must be inside the host's configured `allowedRoots`; the fresh default is its launch directory. Use that workspace or deliberately configure the host's intended roots. |
 | Unknown role | Omit `leadRole` for an empty catalog; with configured roles, choose an advertised name. Changing roles does not rebind an existing Team. |
