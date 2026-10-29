@@ -52,17 +52,32 @@ export async function publishDraft({ plan, directory, request }) {
     assert.equal(value.body, plan.body, 'Draft notes differ; review or remove the draft manually before retrying.');
   };
   requireDraft(release);
-  for (const asset of plan.assets) {
-    // Recheck state before each write; never intentionally write to a published release.
+  const inspectAssets = async () => {
     requireDraft(await request('GET', `${base}/releases/${release.id}`));
-    const assets = await request('GET', `${base}/releases/${release.id}/assets?per_page=100`);
-    assert(assets.length < 100, 'Too many existing assets; refusing an incomplete listing.');
-    const existing = assets.find(row => row.name === asset.name);
-    if (existing) {
+    const assets = new Map();
+    for (let page = 1; ; page++) {
+      assert(page <= 20, 'Asset listing limit reached; refusing an incomplete search.');
+      const rows = await request('GET', `${base}/releases/${release.id}/assets?per_page=100&page=${page}`);
+      for (const row of rows) {
+        assert(!assets.has(row.name), 'Duplicate asset in listing; retry after concurrent changes settle.');
+        assets.set(row.name, row);
+      }
+      if (rows.length < 100) break;
+    }
+    for (const asset of plan.assets) {
+      const existing = assets.get(asset.name);
+      if (!existing) continue;
       assert.equal(existing.size, asset.size, 'Existing asset differs; overwrites are forbidden.');
       assert.equal(existing.digest, `sha256:${asset.sha256}`, 'Existing asset differs or lacks a digest; overwrites are forbidden.');
-      continue;
     }
+    return assets;
+  };
+  // Refuse any existing conflict before the first upload, regardless of plan order.
+  await inspectAssets();
+  for (const asset of plan.assets) {
+    // Recheck the draft and entire plan before each write to catch concurrent changes.
+    const assets = await inspectAssets();
+    if (assets.has(asset.name)) continue;
     await request('UPLOAD', `${base}/releases/${release.id}/assets?name=${encodeURIComponent(asset.name)}`, files.get(asset.name));
   }
   requireDraft(await request('GET', `${base}/releases/${release.id}`));
