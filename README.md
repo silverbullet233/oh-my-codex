@@ -1,60 +1,58 @@
 # Oh My Codex
 
-A repository of independent Codex plugins and reusable skills. The repository root owns discovery, documentation and development tooling; each plugin is a self-contained package under `plugins/<name>/`.
+Independent Codex plugins and reusable skills. Each plugin is self-contained under `plugins/<name>/`; the repository root owns the marketplace catalog and development tooling.
 
-## Catalog
-
-| Plugin | Purpose | Source and instructions |
+| Plugin | Purpose | Setup |
 | --- | --- | --- |
-| DSH Agent Team | Explicit MCP/CLI client for the same native DSH Session service used by Web | [plugins/dsh-agent-team](plugins/dsh-agent-team/README.md) |
+| DSH Agent Team | Explicit MCP client for the same native DSH Session service used by Web | [Getting started](plugins/dsh-agent-team/docs/getting-started.md) · [Plugin README](plugins/dsh-agent-team/README.md) |
 
-There are no standalone skills yet. See [skills/](skills/README.md) for the convention; the DSH workflow skill remains bundled inside its plugin.
+## Install in Codex
 
-## Discovery and installation
-
-The repository marketplace is [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json). Its `./plugins/dsh-agent-team` source is relative to this repository root, as specified by the [official marketplace format](https://developers.openai.com/plugins/build/plugins#marketplace-metadata). It lists the plugin as available, without enabling it or changing account access.
-
-Open this repository in a supported local Codex client and use its plugin browser to select **Oh My Codex → DSH Agent Team**. For a GitHub marketplace import, use the repository URL `https://github.com/silverbullet233/oh-my-codex` with the repository-root Path; select the desired branch/commit. Do not import the repository root as one plugin. Git-backed single-plugin sources use `source: "git-subdir"` with `path: "./plugins/dsh-agent-team"`, rather than a root-plugin source. See [official GitHub marketplace guidance](https://learn.chatgpt.com/docs/enterprise/plugin-management).
-
-The CLI can explicitly register the local checkout using `codex plugin marketplace add .` from this directory, then list it with `codex plugin marketplace list`. These commands were verified with a disposable configuration directory; this migration does not run them against your personal configuration. Use `/plugins` to choose the plugin in Codex.
-
-The standalone plugin directory, built folder and npm tarball each contain their own `plugin.json`, `mcp.json`, skill and runtime files. `${PLUGIN_ROOT}` resolves to that installed plugin directory, not this repository. Source commands from this repository root are:
+Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
 ```sh
-node plugins/dsh-agent-team/scripts/client.mjs health
-node plugins/dsh-agent-team/src/mcp/main.mjs
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref main
+codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-The DSH client needs an existing compatible native host. Use the exact npm runtime `@deepseek-ai/dsh@0.2.2-alpha.2` with the unreleased local `dsh-team-roles` **0.4.0 candidate**. Upstream local keyless and standalone-installation checks passed; the adaptation remains under review in [dsh-team-roles PR #4](https://github.com/silverbullet233/dsh-team-roles/pull/4). The published host 0.3.0 remains source-locked and does not support that runtime. See the [current compatibility and setup instructions](plugins/dsh-agent-team/docs/getting-started.md). The Codex client itself needs no DSH source checkout or runtime dependencies.
+Start a new Codex session after installation. DSH Agent Team also requires a separately installed, compatible **running DSH Web host with `dsh-team-roles` loaded**. Installing this Codex plugin does not start DSH. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
 
-## Layout and development
+For a stable snapshot, replace `main` with a published semantic tag from [Releases](https://github.com/silverbullet233/oh-my-codex/releases). **`v0.1.0` is the initial candidate; it is not published by this change.** After that tag is available:
+
+```sh
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.1.0
+codex plugin add dsh-agent-team@oh-my-codex
+```
+
+The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.2.0`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
+
+## Update or roll back
+
+To refresh the currently selected ref and reinstall its plugin snapshot:
+
+```sh
+codex plugin marketplace upgrade oh-my-codex
+codex plugin add dsh-agent-team@oh-my-codex
+```
+
+An immutable tag stays on that tag. To select a different published tag (or return to `main`), first remove the marketplace registration, then repeat the install commands with the desired `--ref`:
+
+```sh
+codex plugin marketplace remove oh-my-codex
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref main
+codex plugin add dsh-agent-team@oh-my-codex
+```
+
+This changes the catalog registration and selected plugin snapshot; it does not remove DSH data. Other plugins from this marketplace must also be reinstalled if you want them to use the selected snapshot. Start a new session afterward. The CLI rejects changing an existing marketplace's ref without removing its registration first.
+
+## Repository layout
 
 ```text
 .agents/plugins/marketplace.json   Repository marketplace
 plugins/<name>/                   Self-contained plugin packages
 skills/<name>/                    Future standalone reusable skills
-scripts/                         Repository catalog tooling
-test/                            Repository layout checks
+scripts/                         Catalog, installation and release tooling
+test/                            Catalog and release checks
 ```
 
-Run the workspace checks from this directory:
-
-```sh
-npm test
-npm run build
-npm run pack:check
-```
-
-To work on or package one plugin:
-
-```sh
-npm run test:unit --workspace dsh-agent-team
-npm run build --workspace dsh-agent-team
-npm pack --workspace dsh-agent-team --ignore-scripts --pack-destination /absolute/output/directory
-```
-
-The root npm package is private workspace tooling, not an installable plugin. Build output belongs to each plugin's `dist/` directory. Add future plugins with their own manifest and marketplace entry; plugin-specific code, tests and docs remain with that package. No unrelated plugin or skill is added by this migration.
-
-## Migration from the previous layout
-
-The former root `src`, `scripts/client.mjs`, `plugin.json`, `mcp.json`, plugin skill and package metadata moved under `plugins/dsh-agent-team/`. Update direct MCP/source paths and any saved plugin source to that subdirectory, or refresh the repository marketplace. Existing packaged installations still use `${PLUGIN_ROOT}` and keep their self-contained layout. Plugin identity `dsh-agent-team`, version 0.2.0 and IPC protocol 1 are unchanged. The native `dsh-team-roles` package, Session data, role bindings and user configuration are untouched.
+There are no standalone skills yet; the DSH workflow skill stays inside its plugin. For development, migration from the former root-plugin layout and release maintenance, see [CONTRIBUTING.md](CONTRIBUTING.md).

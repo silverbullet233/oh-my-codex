@@ -1,15 +1,17 @@
 {
   "name": "oh-my-codex",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Repository catalog and development workspace for Codex plugins and standalone skills",
   "engines": { "node": ">=24.9.0" },
   "workspaces": ["plugins/*"],
   "scripts": {
-    "check": "node scripts/check-catalog.mjs && npm run check --workspaces --if-present",
+    "check": "node scripts/check-catalog.mjs && node scripts/release/metadata.mjs && npm run check --workspaces --if-present",
     "test": "node --test test/*.test.mjs && npm run test:unit --workspaces --if-present",
     "build": "npm run check && npm run build --workspaces --if-present",
-    "pack:check": "npm run pack:check --workspaces --if-present"
+    "pack:check": "npm run pack:check --workspaces --if-present",
+    "release:prepare": "node scripts/release/prepare.mjs",
+    "test:install": "node scripts/test-codex-install.mjs"
   }
 }

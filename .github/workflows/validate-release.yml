@@ -1,0 +1,67 @@
+name: Validate catalog and prepare draft release
+
+'on':
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.9.0'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/release/metadata.mjs "$RELEASE_TAG"
+      - run: npm test
+      - run: npm run build
+      - run: npm run pack:check
+      - name: Prepare and verify local release assets
+        run: npm run release:prepare -- --output "$RUNNER_TEMP/release-check"
+
+  draft-release:
+    name: Upload draft release
+    needs: validate
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.repository == 'silverbullet233/oh-my-codex'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: draft-release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.9.0'
+          package-manager-cache: false
+      - name: Prepare release from the validated tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: npm run release:prepare -- --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/release"
+      - name: Create or resume draft without replacing assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/publish-draft.mjs "$RUNNER_TEMP/release"
