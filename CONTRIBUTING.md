@@ -48,6 +48,7 @@ These operations were verified with Codex CLI 0.164.0. This optional check uses 
 From a clean checkout of the intended, reviewed main-branch commit:
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
@@ -55,6 +56,8 @@ npm run release:prepare -- --tag v0.1.0 --output ./dist/release-v0.1.0
 ```
 
 The tag above is the first candidate, not a claim that it exists remotely. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
+
+Run the same install/build sequence before each preparation: npm normalizes workspace executable bits during installation, which affects archive bytes. Both hosted validation and the draft job use the same Node version and sequence. Do not prepare a replacement from a differently configured workstation if an existing draft's asset digest differs.
 
 Output:
 

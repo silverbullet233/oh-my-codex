@@ -138,6 +138,8 @@ test('workflow restricts write permissions and uses full immutable action pins',
   assert.match(yaml, /needs: validate/);
   assert.match(yaml, /if: github.event_name == 'push' && startsWith\(github.ref, 'refs\/tags\/'\)/);
   assert.match(yaml, /persist-credentials: false/);
+  assert.equal([...yaml.matchAll(/run: npm ci --ignore-scripts --no-audit --no-fund/gu)].length, 2);
+  assert.equal([...yaml.matchAll(/run: npm run build/gu)].length, 2);
   assert(!/^\s+run:.*\$\{\{/mu.test(yaml), 'Untrusted expressions must pass through environment variables.');
   assert.match(yaml, /RELEASE_TAG: \$\{\{ github.ref_name \}\}/);
 });

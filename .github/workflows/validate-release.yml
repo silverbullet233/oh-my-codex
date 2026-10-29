@@ -57,6 +57,9 @@ jobs:
         with:
           node-version: '24.9.0'
           package-manager-cache: false
+      # Match validation's workspace/bin normalization and build steps before packing.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
       - name: Prepare release from the validated tag
         env:
           RELEASE_TAG: ${{ github.ref_name }}
