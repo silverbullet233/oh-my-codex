@@ -49,6 +49,8 @@ test('normal installation guides pin the catalog version and versioned host rele
     assert(refs.length > 0);
     assert(refs.every(ref => ref === `v${pkg.version}`), `${file} must follow the exact catalog version`);
     assert(!text.includes('--ref feat/'));
+    assert(text.includes('Git must already authenticate an account with repository access'));
+    assert(!text.includes('public assets are published'));
   }
   const guide = await readFile(join(root, 'plugins/dsh-agent-team/docs/getting-started.md'), 'utf8');
   const assets = [...guide.matchAll(/https:\/\/github\.com\/silverbullet233\/dsh-team-roles\/releases\/download\/([^/\s]+)\/([^\s]+)/g)];
