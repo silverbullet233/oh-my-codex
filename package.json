@@ -1,11 +1,15 @@
 {
   "name": "oh-my-codex",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Repository catalog and development workspace for Codex plugins and standalone skills",
-  "engines": { "node": ">=24.9.0" },
-  "workspaces": ["plugins/*"],
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "workspaces": [
+    "plugins/*"
+  ],
   "scripts": {
     "check": "node scripts/check-catalog.mjs && node scripts/release/metadata.mjs && npm run check --workspaces --if-present",
     "test": "node --test test/*.test.mjs && npm run test:unit --workspaces --if-present",
@@ -13,5 +17,16 @@
     "pack:check": "npm run pack:check --workspaces --if-present",
     "release:prepare": "node scripts/release/prepare.mjs",
     "test:install": "node scripts/test-codex-install.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.6-alpha.1",
+    "@deepseek-ai/dsh-client-connection": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-api-gateway": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-typert-registry": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-host-webserver": "0.2.2-alpha.2",
+    "zod": "4.4.3",
+    "ws": "8.22.0"
   }
 }

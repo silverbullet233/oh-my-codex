@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "dsh-agent-team",
-  "version": "0.2.0",
-  "description": "Explicit Codex MCP client for native DSH Team roles and Sessions.",
+  "version": "0.3.0",
+  "description": "Opt-in native DSH Teams with a dedicated Codex-owned Web host.",
   "author": {
     "name": "oh-my-codex contributors"
   },
@@ -11,7 +11,7 @@
       "interface": {
         "displayName": "DSH Agent Team",
         "shortDescription": "Native DSH team sessions",
-        "longDescription": "Submit and continue native DSH team sessions through the same host used by DSH Web.",
+        "longDescription": "Start and reuse a dedicated native DSH Web instance, create and continue Teams through the official Gateway, and open its native UI.",
         "developerName": "oh-my-codex contributors",
         "category": "Developer Tools",
         "defaultPrompt": "Use DSH Agent Team for this task."

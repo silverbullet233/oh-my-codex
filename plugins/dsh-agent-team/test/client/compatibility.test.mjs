@@ -3,20 +3,23 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BridgeClient } from '../../src/bridge/client.mjs';
-import { serveFakeBridge, contract } from '../fixtures/ipc-server.mjs';
 import { createDispatcher } from '../../src/mcp/server.mjs';
-async function fixture(t, { catalog, createError, healthResult, ...options } = {}) {
-  const root=await mkdtemp(join(tmpdir(),'dsh-client-'));const socketPath=join(root,'ipc.sock');const calls=[];
-  const server=await serveFakeBridge({socketPath,bridge:{dispatch:async(method,params)=>{
-    calls.push({method,params});
-    if(method==='health')return {ok:true,...healthResult,...(catalog===undefined?{}:{roles:catalog})};
-    if(method==='create' && createError)throw createError;
-    return {accepted:true};
-  }},...options});
-  const client=new BridgeClient({socketPath});
-  t.after(async()=>{client.close();await server.close();await rm(root,{recursive:true,force:true});});
-  return {client,calls};
+import { GatewayClient } from '../../src/native/gateway.mjs';
+import { loadRuntime } from '../../src/native/runtime.mjs';
+import { serveNativeFixture, contract } from '../fixtures/native-server.mjs';
+import { ownedFixture } from '../fixtures/owned.mjs';
+async function fixture(t, { catalog, createError, healthResult, health = contract } = {}) {
+  const owned = await ownedFixture(t);
+  const calls = [];
+  const server = await serveNativeFixture({ health, dispatch: async (method, params) => {
+    calls.push({ method, params });
+    if (method === 'health') return { ...healthResult, ...(catalog === undefined ? {} : { roles: catalog }) };
+    if (method === 'create' && createError) throw createError;
+    return { accepted: true };
+  } });
+  const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
+  t.after(async () => { await client.close(); await server.close(); });
+  return { client, calls };
 }
 test('independent client handshakes capabilities before a write and retains exact params',async t=>{
   const {client,calls}=await fixture(t);
@@ -32,7 +35,7 @@ test('MCP preserves released runtime package identity with null sourceSha and ad
   const health = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } });
   assert.equal(health.result.structuredContent.sourceSha, null);
   assert.equal(health.result.structuredContent.runtime.packageVersion, '0.2.2-alpha.2');
-  assert.deepEqual(health.result.structuredContent.protocol, contract);
+  assert.deepEqual(health.result.structuredContent.api, contract);
   const params = { key: 'released-runtime', cwd: '/synthetic', text: 'Synthetic release runtime input.' };
   const created = await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_create', arguments: params } });
   assert.equal(created.result.structuredContent.accepted, true);
@@ -43,19 +46,19 @@ test('missing native capabilities refuse work before create dispatch',async t=>{
   await assert.rejects(client.request('create',{}),error=>error.code==='CAPABILITY_MISMATCH');
   assert.deepEqual(calls.map(c=>c.method),['health']);
 });
-test('incompatible response versions refuse work without fallback',async t=>{
-  const {client,calls}=await fixture(t,{protocol:0});
-  await assert.rejects(client.request('send',{}),error=>error.code==='PROTOCOL_MISMATCH');
+test('incompatible API versions refuse work without fallback',async t=>{
+  const {client,calls}=await fixture(t,{health:{...contract,version:0}});
+  await assert.rejects(client.request('send',{}),error=>error.code==='CAPABILITY_MISMATCH');
   assert.deepEqual(calls.map(c=>c.method),['health']);
 });
 
 test('oversized client writes are rejected locally after health and before native dispatch',async t=>{
   const {client,calls}=await fixture(t);
   await assert.rejects(client.request('send',{teamId:'synthetic',text:'x'.repeat(131072)}),error=>error.code==='REQUEST_TOO_LARGE');
-  assert.deepEqual(calls.map(c=>c.method),['health']);
+  assert.deepEqual(calls.map(c=>c.method),[]);
 });
 
-test('MCP accepts a protocol-1 empty role catalog and leaves native inheritance to the host', async t => {
+test('MCP accepts a API-1 empty role catalog and leaves native inheritance to the host', async t => {
   const catalog = { leadRole: '', roles: [] };
   const { client, calls } = await fixture(t, { catalog });
   assert.deepEqual((await client.request('health')).roles, catalog);
@@ -68,13 +71,13 @@ test('MCP accepts a protocol-1 empty role catalog and leaves native inheritance 
 });
 
 test('an explicit role refusal propagates through MCP without dropping the role or retrying native defaults', async t => {
-  const error = Object.assign(new Error('The explicit native role was rejected.'), { code: 'NATIVE_FAILURE' });
+  const error = Object.assign(new Error('The explicit native role was rejected.'), { code: 'team-roles/NATIVE_FAILURE' });
   const { client, calls } = await fixture(t, { catalog: { leadRole: '', roles: [] }, createError: error });
   const dispatch = createDispatcher(client);
   await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   const params = { key: 'explicit-role', cwd: '/synthetic', text: 'Synthetic strict role input.', leadRole: 'unknown' };
   const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_create', arguments: params } });
   assert.equal(response.result.isError, true);
-  assert.equal(JSON.parse(response.result.content[0].text).code, 'NATIVE_FAILURE');
+  assert.equal(JSON.parse(response.result.content[0].text).code, 'team-roles/NATIVE_FAILURE');
   assert.deepEqual(calls, [{ method: 'health', params: {} }, { method: 'create', params }]);
 });

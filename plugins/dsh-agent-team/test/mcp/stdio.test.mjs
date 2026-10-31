@@ -4,11 +4,11 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { serveFakeBridge as serveBridge } from '../fixtures/ipc-server.mjs';
+import { ownedFixture } from '../fixtures/owned.mjs';
 
-function run(socketPath, lines) {
+function run(env, lines) {
   return new Promise((resolve_, reject) => {
-    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], { env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: socketPath }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });
@@ -19,28 +19,28 @@ function run(socketPath, lines) {
   });
 }
 
-test('stdio EOF preserves independently owned IPC host and a new client can reconnect', async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), 'dsh-mcp-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const socketPath = join(directory, 'team.sock');
-  const calls = [];
-  const server = await serveBridge({ socketPath, bridge: { dispatch: async (method, params) => { calls.push({ method, params }); return { ok: true }; } } });
-  t.after(() => server.close());
-  const lines = `${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })}\n${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } })}\n`;
+test('stdio EOF preserves its owned native host and a new MCP process reconnects', async t => {
+  const fixture = await ownedFixture(t);
+  const lines = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } },
+  ].map(row => JSON.stringify(row)).join('\n') + '\n';
+  let pid;
   for (let iteration = 0; iteration < 2; iteration++) {
-    const result = await run(socketPath, lines);
-    assert.equal(result.code, 0, result.stderr);
-    assert.equal(result.stderr, '');
-    const responses = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
+    const result = await run(fixture.env, lines);
+    assert.equal(result.code, 0, result.stderr); assert.equal(result.stderr, '');
+    const responses = result.stdout.trim().split('\n').map(JSON.parse);
     assert.equal(responses.length, 2);
-    assert.equal(responses[1].result.structuredContent.ok, true);
-    assert.equal(responses[1].result.structuredContent.protocol.version, 1);
+    assert.equal(responses[1].result.structuredContent.api.version, 1);
+    const current = responses[1].result.structuredContent.host.pid;
+    if (pid) assert.equal(current, pid); else pid = current;
+    assert.doesNotMatch(result.stdout + result.stderr, /token=|Cookie|DSH_OWNED_INSTANCE_ID/);
   }
-  assert.deepEqual(calls, [{ method: 'health', params: {} }, { method: 'health', params: {} }]);
+  assert.equal(await fixture.starts(), 1);
 });
 
 test('malformed and oversized stdio input never runs a bridge operation', async () => {
-  const missing = join(tmpdir(), 'intentionally-absent-dsh.sock');
+  const missing = { PATH: process.env.PATH };
   const malformed = await run(missing, 'not-json\n');
   assert.equal(JSON.parse(malformed.stdout).error.code, -32700);
   const oversized = await run(missing, `${' '.repeat(1_048_577)}\n`);

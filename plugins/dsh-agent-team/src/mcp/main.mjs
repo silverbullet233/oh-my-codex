@@ -1,15 +1,8 @@
 #!/usr/bin/env node
-import { BridgeClient } from '../bridge/client.mjs';
+import { OwnedHost } from '../host/manager.mjs';
 import { createDispatcher } from './server.mjs';
 import { createExactRequestClient } from './exact-request.mjs';
-import { resolveSocketPath } from '../bridge/socket-path.mjs';
-
-const socketPath = resolveSocketPath();
-if (!socketPath) {
-  process.stderr.write('Set DSH_AGENT_TEAM_SOCKET to the shared native host IPC socket.\n');
-  process.exit(1);
-}
-const client = new BridgeClient({ socketPath });
+const client = new OwnedHost();
 let requestClient = client;
 if (process.env.DSH_AGENT_TEAM_MCP_REQUEST_POLICY !== undefined) {
   try { requestClient = createExactRequestClient(client, JSON.parse(process.env.DSH_AGENT_TEAM_MCP_REQUEST_POLICY)); }
@@ -49,6 +42,6 @@ process.stdin.on('end', () => {
     pending = pending.then(() => write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Incomplete JSON line.' } }));
   }
   // EOF closes this client only. No native Session cancellation or host shutdown.
-  pending.then(() => { process.exitCode ??= 0; });
+  pending.then(async () => { await client.close(); process.exitCode ??= 0; });
 });
 process.stdin.on('error', (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });

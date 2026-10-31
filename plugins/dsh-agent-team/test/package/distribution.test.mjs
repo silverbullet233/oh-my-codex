@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { serveFakeBridge } from '../fixtures/ipc-server.mjs';
+import { ownedFixture } from '../fixtures/owned.mjs';
 
 const pluginRoot = resolve(import.meta.dirname, '../..');
 const repositoryRoot = resolve(pluginRoot, '../..');
@@ -33,10 +33,7 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
   await run('tar', ['-xzf', join(root, packed.filename), '-C', root], { cwd: root });
   const packagedRoot = join(root, 'package');
   await assert.rejects(access(join(packagedRoot, 'node_modules')), error => error.code === 'ENOENT');
-  const socketPath = join(root, 'fixture.sock');
-  const calls = [];
-  const server = await serveFakeBridge({ socketPath, bridge: { dispatch: async method => { calls.push(method); return { ok: true, roles: { leadRole: '', roles: [] } }; } } });
-  t.after(() => server.close());
+  const fixture = await ownedFixture(t);
   const requests = [
     { jsonrpc: '2.0', id: 1, method: 'initialize' },
     { jsonrpc: '2.0', id: 2, method: 'tools/list' },
@@ -49,13 +46,13 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
     const output = await run(config.command, config.args.map(expand), {
       // Deliberately disregard declared cwd: entrypoints must also work from elsewhere.
       cwd: directory === pluginRoot ? repositoryRoot : root,
-      env: { PATH: process.env.PATH, DSH_AGENT_TEAM_SOCKET: socketPath }, input: requests,
+      env: fixture.env, input: requests,
     });
     const replies = output.trim().split('\n').map(JSON.parse);
     assert.equal(replies[0].result.serverInfo.name, 'dsh-agent-team');
-    assert.equal(replies[1].result.tools.length, 6);
+    assert.equal(replies[1].result.tools.length, 8);
     assert.equal(replies[2].result.structuredContent.ok, true);
-    assert.equal(replies[2].result.structuredContent.protocol.version, 1);
+    assert.equal(replies[2].result.structuredContent.api.version, 1);
   }
-  assert.deepEqual(calls, ['health', 'health', 'health']);
+  assert.equal(await fixture.starts(), 1);
 });
