@@ -1,5 +1,4 @@
-import { spawn, execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { spawn } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { open, unlink, mkdir, readdir, realpath } from 'node:fs/promises';
@@ -8,7 +7,8 @@ import { privateDirectory, readPrivate, writePrivate, birth, delay, withLifecycl
 import { loadRuntime } from '../native/runtime.mjs';
 import { GatewayClient } from '../native/gateway.mjs';
 import { ClientError } from '../native/errors.mjs';
-const execute = promisify(execFile);
+import { handoffBrowser } from './browser.mjs';
+import { diagnosticPath } from './output.mjs';
 export function configuration(env = process.env) {
   return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000 };
 }
@@ -62,7 +62,7 @@ export class OwnedHost {
     return entry;
   }
   async ensure() {
-    let failedRunner;
+    let failedRunner, diagnosticsPath;
     this.starting ??= this.locked(async () => {
       let entry = await this.current();
       const pendingDeadline = Date.now() + this.config.startupTimeoutMs + 5000;
@@ -74,6 +74,8 @@ export class OwnedHost {
       }
       if (!entry) {
         const instanceId = randomUUID();
+        diagnosticsPath = diagnosticPath(this.directory, instanceId);
+        await writePrivate(diagnosticsPath, { version: 1, instanceId, text: '' });
         const launchPath = join(this.directory, `launch-${instanceId}.json`);
         await writePrivate(launchPath, { ...this.config, cwd: this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId });
         const runner = spawn(process.execPath, [join(import.meta.dirname, 'runner.mjs'), this.directory, launchPath], { env: process.env, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
@@ -101,21 +103,26 @@ export class OwnedHost {
         const deadline = Date.now() + 4000;
         while (failedRunner.exitCode === null && failedRunner.signalCode === null && Date.now() < deadline) await delay(25);
       }
-      throw error;
+      throw this.withDiagnostics(error, diagnosticsPath);
     }).finally(() => { this.starting = undefined; });
     return this.starting;
   }
-  async request(method, params = {}) {
-    if (method === 'shutdown') return this.shutdown();
-    await this.ensure();
-    if (method === 'web') {
-      const command = process.platform === 'darwin' ? 'open' : process.platform === 'linux' ? 'xdg-open' : null;
-      if (!command) throw new ClientError('PLATFORM_UNSUPPORTED', 'Native Web handoff is validated on macOS and Linux only.');
-      try { await execute(command, [this.entry.url]); } catch { throw new ClientError('WEB_OPEN_FAILED', 'Could not open the native Web entry. No launch capability was logged.'); }
-      return { opened: true, url: new URL(this.entry.url).origin };
+  withDiagnostics(error, path = this.entry && diagnosticPath(this.directory, this.entry.instanceId)) {
+    if (error instanceof ClientError && path && !error.diagnosticsPath) {
+      error.diagnosticsPath = path; error.message += ` Diagnostics: ${path}`;
     }
-    const value = await this.gateway.request(method, params);
-    return method === 'health' ? { ...value, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
+    return error;
+  }
+  async request(method, params = {}) {
+    try {
+      if (method === 'shutdown') return await this.shutdown();
+      await this.ensure();
+      if (method === 'web') {
+        return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
+      }
+      const value = await this.gateway.request(method, params);
+      return method === 'health' ? { ...value, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
+    } catch (error) { throw this.withDiagnostics(error); }
   }
   async shutdown() {
     let supervisor;
@@ -139,7 +146,8 @@ export class OwnedHost {
         if (birth(entry.pid) === entry.birth) throw new ClientError('SHUTDOWN_PENDING', 'Graceful host shutdown is pending. No force-kill was sent; the admission fence will expire.');
         await this.gateway?.close(); this.gateway = undefined; this.entry = undefined;
         return { stopped: true };
-      } finally { await client.close(); }
+      } catch (error) { throw this.withDiagnostics(error, diagnosticPath(this.directory, entry.instanceId)); }
+      finally { await client.close(); }
     });
     // Exit cleanup needs the same coordination lock, so wait after releasing it.
     if (result.stopped && supervisor?.birth) {

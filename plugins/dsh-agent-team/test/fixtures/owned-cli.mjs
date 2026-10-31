@@ -18,5 +18,7 @@ const server = await serveNativeFixture({ dispatch: async (method, request) => {
 const url = server.url;
 // Deliberately split output to test launch-line parsing. Capability never reaches test logs.
 process.stdout.write('Web: ' + url.slice(0, -8));
-setImmediate(() => process.stdout.write(url.slice(-8) + '\n'));
+setTimeout(() => process.stderr.write('Synthetic activation diagnostic\n'), 10);
+setTimeout(() => process.stdout.write(url.slice(-8) + '\n'), 35);
+setTimeout(() => process.stderr.write('Synthetic post-ready diagnostic\n'), 150);
 process.on('SIGTERM', async () => { await server.close(); process.exit(0); });

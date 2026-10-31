@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { readPrivate, writePrivate, birth, removeIf, withLifecycleLock } from './files.mjs';
+import { captureNativeOutput, diagnosticLog, diagnosticPath } from './output.mjs';
 const directory = process.argv[2];
 const config = await readPrivate(process.argv[3]);
 const provisional = join(directory, 'starting.json');
@@ -15,32 +16,29 @@ const child = spawn(process.execPath, [config.cli, '--profile', config.profile, 
 const attribution = writePrivate(provisional, { version: 1, birthFormat: 'utc-c-v1', phase: 'child-published', instanceId: config.instanceId, supervisorPid: process.pid, supervisorBirth: birth(process.pid), ...(child.pid ? { pid: child.pid, birth: birth(child.pid) } : {}) });
 const record = join(directory, `ready-${config.instanceId}.json`);
 let publication = Promise.resolve();
-let ready = false, finished = false, buffer = '';
+let ready = false, finished = false;
+const diagnosticsPath = diagnosticPath(directory, config.instanceId);
+const diagnostics = diagnosticLog(diagnosticsPath, config.instanceId);
 const report = value => { if (process.connected) process.send(value); };
 const deadline = setTimeout(() => { if (!ready) child.kill('SIGTERM'); }, config.startupTimeoutMs);
-const consume = chunk => {
-  if (ready || finished) return;
-  buffer = (buffer + chunk.toString('utf8')).slice(-32768);
-  const end = buffer.lastIndexOf('\n');
-  if (end < 0) return;
-  const lines = buffer.slice(0, end); buffer = buffer.slice(end + 1);
-  for (const match of lines.matchAll(/http:\/\/127\.0\.0\.1:\d+[^\s<>"']*/g)) {
-    let url; try { url = new URL(match[0].replace(/\x1b\[[0-9;]*m/g, '')); } catch { continue; }
-    if (!url.searchParams.get('token') || !birth(child.pid)) continue;
-    ready = true; clearTimeout(deadline);
-    publication = attribution.then(() => writePrivate(record, { version: 1, birthFormat: 'utc-c-v1', home: config.home, instanceId: config.instanceId, pid: child.pid, birth: birth(child.pid), supervisorPid: process.pid, url: url.href, runtimeAnchor: config.runtimeAnchor })).then(() => {
-      if (finished) return;
-      report({ ready: true }); if (process.connected) process.disconnect();
-    }, () => child.kill('SIGTERM'));
-    break;
-  }
-};
-child.stdout.on('data', consume); child.stderr.on('data', consume);
+const output = captureNativeOutput(url => {
+  if (ready || finished || !birth(child.pid)) return false;
+  ready = true; clearTimeout(deadline);
+  publication = attribution.then(() => writePrivate(record, { version: 1, birthFormat: 'utc-c-v1', home: config.home, instanceId: config.instanceId, pid: child.pid, birth: birth(child.pid), supervisorPid: process.pid, url, runtimeAnchor: config.runtimeAnchor, diagnosticsPath })).then(() => {
+    if (finished) return;
+    report({ ready: true }); if (process.connected) process.disconnect();
+  }, () => child.kill('SIGTERM'));
+  return true;
+}, line => diagnostics.append(line));
+for (const name of ['stdout', 'stderr']) {
+  child[name].on('data', chunk => output.push(name, chunk));
+  child[name].on('end', () => output.end(name));
+}
 let finalized = false;
 const finalize = async () => {
   if (finalized) return; finalized = true;
   finished = true; clearTimeout(deadline);
-  await Promise.allSettled([attribution, publication]);
+  await Promise.allSettled([attribution, publication, diagnostics.flush()]);
   report({ error: ready ? 'HOST_EXITED' : 'STARTUP_FAILED' });
   await withLifecycleLock(directory, config.startupTimeoutMs + 5000, async () => {
     await removeIf(record, config.instanceId).catch(() => {});
@@ -51,5 +49,5 @@ const finalize = async () => {
   process.exit(ready ? 0 : 1);
 };
 child.on('error', () => { void finalize(); });
-child.on('exit', () => { void finalize(); });
+child.on('close', () => { void finalize(); });
 process.on('SIGTERM', () => { if (!finished) child.kill('SIGTERM'); });

@@ -198,3 +198,31 @@ test('unversioned historical process timestamps cannot make a live host look sto
   assert.equal(await fixture.starts(), 1); assert.equal(birth(health.host.pid), actual.birth);
   await writePrivate(path, actual);
 });
+
+test('interleaved startup authenticates and private diagnostics continue after readiness', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  let health;
+  try { health = await fixture.owner.request('health'); }
+  catch (error) {
+    // A deliberately broken parser must not strand this idle, test-owned process during regression reproduction.
+    const entry = await fixture.owner.current();
+    if (entry && birth(entry.pid) === entry.birth) {
+      process.kill(entry.pid, 'SIGTERM');
+      for (let i = 0; i < 200 && birth(entry.pid); i++) await delay(10);
+    }
+    throw error;
+  }
+  assert(health.diagnostics.path.includes(fixture.owner.entry.instanceId));
+  let diagnostics;
+  for (let i = 0; i < 200; i++) {
+    diagnostics = await readPrivate(health.diagnostics.path);
+    if (diagnostics?.text.includes('Synthetic post-ready diagnostic')) break;
+    await delay(10);
+  }
+  assert(diagnostics.text.includes('Synthetic activation diagnostic'));
+  assert(diagnostics.text.includes('Synthetic post-ready diagnostic'));
+  const token = new URL(fixture.owner.entry.url).searchParams.get('token');
+  assert(!diagnostics.text.includes(token), 'The launch capability must never appear in diagnostics');
+  const { lstat } = await import('node:fs/promises');
+  assert.equal((await lstat(health.diagnostics.path)).mode & 0o077, 0);
+});

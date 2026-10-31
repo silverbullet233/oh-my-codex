@@ -2,10 +2,11 @@ import { assertNativeDiagnostics } from '../fixtures/diagnostics.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, delimiter } from 'node:path';
 import { ownedFixture } from '../fixtures/owned.mjs';
+import { birth, delay } from '../../src/host/files.mjs';
 
 function run(env, lines) {
   return new Promise((resolve_, reject) => {
@@ -47,4 +48,32 @@ test('malformed and oversized stdio input never runs a bridge operation', async 
   const oversized = await run(missing, `${' '.repeat(1_048_577)}\n`);
   assert.equal(oversized.code, 1);
   assert.match(oversized.stderr, /input limit/);
+});
+
+test('a long-running browser launcher cannot block the next serialized MCP health request', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  const bin = join(fixture.home, 'bin'); await mkdir(bin);
+  const pidFile = join(fixture.home, 'browser-pid'); let pid;
+  t.after(async () => { if (pid && birth(pid)) process.kill(pid, 'SIGTERM'); });
+  const source = ['#!/bin/sh', 'echo $$ > "$DSH_HANDOFF_PID"', 'exec sleep 30', ''].join('\n');
+  for (const name of ['open', 'xdg-open']) await writeFile(join(bin, name), source, { mode: 0o700 });
+  const env = { ...fixture.env, PATH: bin + delimiter + process.env.PATH, DSH_HANDOFF_PID: pidFile };
+  const lines = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web', arguments: {} } },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } },
+  ].map(row => JSON.stringify(row)).join('\n') + '\n';
+  const resultPromise = run(env, lines);
+  for (let i = 0; i < 200 && !pid; i++) {
+    try { pid = Number(await readFile(pidFile, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (!pid) await delay(10);
+  }
+  assert(pid);
+  let timer;
+  const result = await Promise.race([resultPromise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Browser handoff blocked subsequent MCP work')), 4000); })]).finally(() => clearTimeout(timer));
+  assert.equal(result.code, 0); assertNativeDiagnostics(result.stderr);
+  const responses = result.stdout.trim().split('\n').map(JSON.parse);
+  assert.equal(responses.length, 3); assert.equal(responses[1].result.structuredContent.opened, true);
+  assert.equal(responses[2].result.structuredContent.ok, true); assert(birth(pid));
+  assert(!/token=|Cookie/.test(result.stdout + result.stderr), 'MCP output must not contain a capability');
 });

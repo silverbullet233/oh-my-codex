@@ -47,7 +47,7 @@ Keep `teamId` and the create/input IDs. Send follow-ups to that Team rather than
 
 ## Connection and lifetime
 
-- Each process starts a dedicated loopback Web listener on a free port. `dsh_team_web` invokes the native launch URL through the OS browser handoff and returns a clean origin. API cookies are separate from browser cookies.
+- Each process starts a dedicated loopback Web listener on a free port. `dsh_team_web` invokes the native launch URL through the OS browser handoff and returns a clean origin. Browser handoff is bounded even when the launcher remains alive; it never terminates the browser. API cookies are separate from browser cookies.
 - Native `/connect` authentication is renewed after Mux closure or host restart. Writes with uncertain outcomes are not replayed automatically. Retain their IDs and inspect native status before retrying.
 - Closing Codex/MCP does not cancel work. `dsh_team_stop` interrupts a Team and reports observed quiescence separately from cancellation acceptance. Native inboxes and file changes remain.
 - `dsh_team_shutdown` refuses active, provisioning, queued or uncertain work, including unmanaged Web Sessions. On a safe result it sends graceful termination only to the attributed process. A lost preparation reply or failed termination leaves a five-second native fence that expires.
@@ -66,3 +66,5 @@ Keep `teamId` and the create/input IDs. Send follow-ups to that Team rather than
 | `OUTCOME_UNCERTAIN` | Retain the original key/input ID, reconnect, inspect status and retry only the same authorized content |
 | `SHUTDOWN_PENDING` | No force-kill was sent; inspect native work and retry after the fence expires |
 | Native approval unavailable | Open native Web and handle approvals there; this passive API Peer cannot answer them |
+
+Health and Web handoff return `diagnostics.path`, and startup errors include the corresponding local diagnostic path. Each instance retains a private 0600 JSON log with at most 64 KiB of recent native stdout/stderr, including output after readiness. Launch capabilities, URL queries, cookies and credential fields are redacted before writing. Inspect that local file when activation or runtime calls fail; never copy private launch metadata into reports. Oversized native lines are omitted rather than logging an unlabelled suffix.
