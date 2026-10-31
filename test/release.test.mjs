@@ -30,6 +30,9 @@ test('local preparation produces usable archives and matching checksums without 
   const metadata = await releaseMetadata();
   const plan = await prepareRelease({ tag: metadata.tag, output });
   assert.equal(plan.catalogVersion, metadata.version);
+  assert(plan.body.includes(`--ref ${metadata.tag}`), 'Release instructions must pin the catalog tag');
+  assert(plan.body.includes('starts its own ordinary DSH Web host lazily'));
+  assert(!plan.body.includes('compatible running DSH host'));
   assert.equal(plan.plugins[0].version, metadata.plugins[0].version);
   assert.equal(plan.plugins[0].path, './plugins/dsh-agent-team');
   assert.equal(plan.plugins[0].archive, `dsh-agent-team-${metadata.plugins[0].version}.tgz`);

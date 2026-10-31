@@ -6,7 +6,7 @@ Versions here describe the repository catalog. Each plugin has its own version.
 
 - DSH Agent Team 0.3.0 replaces private IPC with the official Node Connection/Typert Gateway.
 - Lazily manage a dedicated ordinary DSH Web host, preserve native persistent data across MCP disconnects and restart, and offer native Web handoff and guarded graceful shutdown.
-- Breaking: configure a dedicated home and the exact DSH 0.2.2-alpha.2 runtime; install the unreleased host 0.5.0 candidate first. Socket configuration is removed.
+- Breaking: configure a dedicated home and the exact DSH 0.2.2-alpha.2 runtime; install the published host 0.5.0 release archive first. Socket configuration is removed.
 
 ## 0.1.0
 
@@ -14,4 +14,4 @@ Versions here describe the repository catalog. Each plugin has its own version.
 - Add semantic Git tag installation, upgrade and rollback instructions.
 - Validate catalog snapshots and prepare draft Releases with plugin archives, version mapping and SHA-256 checksums.
 
-This is a release candidate until a maintainer creates the tag and publishes its draft Release. It does not publish or install the separate DSH host plugin.
+Catalog tags and Releases require an explicit maintainer publication decision. The separate DSH host plugin has its own version and release assets.

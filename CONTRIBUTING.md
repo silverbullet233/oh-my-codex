@@ -55,7 +55,7 @@ npm run pack:check
 npm run release:prepare -- --tag v0.2.0 --output ./dist/release-v0.2.0
 ```
 
-The tag above is the first candidate, not a claim that it exists remotely. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
+The example pins the intended catalog version; verify its version mapping and release authorization before tagging. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
 
 Run the same install/build sequence before each preparation: npm normalizes workspace executable bits during installation, which affects archive bytes. Both hosted validation and the draft job use the same Node version and sequence. Do not prepare a replacement from a differently configured workstation if an existing draft's asset digest differs.
 
@@ -71,7 +71,7 @@ Checksums establish integrity, not a separate signing trust chain. Build output 
 
 ## Tag workflow and draft review
 
-Creating or pushing a release tag is a separate maintainer action, after the release PR is merged and the version is approved. This implementation does not create its initial public tag or Release.
+Creating or pushing a release tag is a separate maintainer action, after the release PR is merged and the version is approved. Do not create or publish a new tag merely because this checklist is present.
 
 The `validate-release.yml` workflow validates pull requests, main and `v*` tags. Validation has read-only repository permissions, immutable full-SHA action pins, disabled persisted checkout credentials, and no lifecycle installation scripts. Both operating systems run tests/build/package checks and local release preparation. A tag must exactly match the catalog version.
 
@@ -81,8 +81,16 @@ Reruns search both drafts and published Releases. An identical draft resumes mis
 
 After the job succeeds, manually review notes, catalog mapping, archives and checksums, then publish the draft through GitHub. That publication requires a separate explicit decision. For a correction after publication, release a new version instead of editing assets. If catalog code/package checks pass but GitHub rejects draft creation, report the exact API status and resolve repository permissions or the release target; do not add a long-lived token as a workaround.
 
-The draft publisher's mutation/error cases are tested with a fake HTTP service. The actual hosted tag/upload/publication path remains untested until the first authorized public tag run; PR validation does not exercise it.
+The draft publisher's mutation/error cases are tested with a fake HTTP service. PR validation does not exercise the hosted tag/upload/publication path; verify that exact tag workflow and its published assets on every authorized release.
 
 ## Earlier layout migration
 
 The former root `src`, `scripts/client.mjs`, `plugin.json`, `mcp.json`, plugin skill and package metadata moved to `plugins/dsh-agent-team/`. Update saved direct source/MCP paths or refresh the repository marketplace. Local checkout installation uses `codex plugin marketplace add .`; do not install the repository root as one plugin. Existing packaged installations keep `${PLUGIN_ROOT}` relative to their self-contained package. Native DSH Session data and user configuration are unaffected.
+
+## Installation pins in every release
+
+Normal installation must use a fixed, published catalog tag with `codex plugin marketplace add ... --ref vX.Y.Z`. Never use `main`, feature branches or floating latest refs as the normal installation source. The catalog version and each plugin version remain independent.
+
+For every authorized release, publish and verify the compatible host first. Use its actual explicit `releases/download/vX.Y.Z/...` archive and SHA256SUMS URLs; never invent asset URLs or substitute a source archive. Check compatibility and isolated installation against those downloaded bytes. Prepare/review any release-note or installation correction before the catalog tag so generated assets describe the actual owned-host behavior. After publication, verify the catalog's exact tag/commit, version mapping, public assets/checksums and a real isolated Codex install. Update all normal installation pins in the root README, plugin README, getting-started guide and generated release instructions together, with reviewed PRs and their CI. Keep the chosen fixed tag on refresh; users must deliberately switch to another verified published tag.
+
+A release-preparation PR may name its intended catalog tag, but it must state that publication is pending until the reviewed main commit is tagged, its workflow succeeds and assets are verified. Do not claim that pending tag/assets are already published. This checklist is a lasting documentation convention, not permission for future merges, releases or daily-use deployment.
