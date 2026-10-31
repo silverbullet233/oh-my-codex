@@ -4,7 +4,7 @@ Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a *
 
 Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.5.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-Catalog **v0.2.0** / plugin **0.3.0** are not yet published; this is release preparation. Use the pinned installation only after the tag and public assets are verified. The intended catalog contains this plugin at independent version **0.3.0**. Register the marketplace with that exact tag; do not use a floating ref.
+Use catalog **v0.2.0** / plugin **0.3.1** only after the tag and public assets are published and verified; while publication is pending, the pin is not an available installer. The catalog and plugin versions are independent. Register the marketplace with that exact tag; do not use a floating ref.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
@@ -28,3 +28,7 @@ Roles and provider authentication are configured in **native Web â†’ Settings â†
 Startup uses an OS-released SQLite transaction lock and provisional launcher/child attribution. Reuse and signaling require matching runtime, native home, nonce, PID and process start time. New instances use `--no-open --port 0` on loopback. A live or uncertain startup is retained rather than replaced. Shutdown refuses active/unknown work, uses the native five-second admission lease, and never force-kills. Persistent Session/attachment/role data is independent of process lifetime. The short-lived launch capability is held only in a private instance record while its process exists; it is never printed or returned by MCP.
 
 See [validation scope](docs/validation.md) for the distinction between synthetic transport fixtures and the real native integration gate.
+
+## Activated orchestration
+
+When explicitly activated, Codex main handles user requirements/system design, task decomposition and acceptance, progress and independent read-only review. DSH Lead owns all implementation, testing/debugging and member coordination. Main sends corrections only to Lead and escalates blockers to the user; it does not take over execution or message members directly. Member/status observations are allowed. This is behavioral skill guidance, not removal of Codex tools or a global sandbox. Native user access is unchanged. See the [orchestration contract](docs/orchestration.md) for the API boundary and release inclusion.
