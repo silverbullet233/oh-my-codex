@@ -1,31 +1,25 @@
-# Client validation
+# Validation scope
 
-## Local keyless checks
-
-Run from the collection root:
+Use Node 26.0.0, matching CI. Normal validation is keyless:
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
+npm run test:install
 ```
 
-The client checks on 2026-10-28 passed **26 tests**: three repository checks and 23 plugin tests. They exercise IPC protocol/capability negotiation before writes, released runtime metadata, exact request policies, private socket ownership, request limits, idempotency argument preservation, empty role catalogs, strict role errors, EOF/reconnection, marketplace paths and distribution startup. Source, built-folder and extracted-tarball clients initialize MCP and read synthetic fixture health without a DSH runtime or npm runtime dependencies.
+The catalog/release tests and client suites cover native API capability checks, exact arguments/policies, owner authority, request bounds, uncertain outcome handling, source/built/tarball entrypoints, MCP EOF, API reauthentication, free-port/concurrent startup, active-work shutdown refusal, persistent restart, failed startup cleanup and foreign-home attribution. The lifecycle unit fixture uses a fabricated CLI with **actual official Connection/Gateway** and synthetic receipts; it is not evidence of native Agent/Team execution. No model accounts are involved.
 
-These tests do not run native Sessions or models. The native plugin owns role bindings, native service identities, runtime compatibility and Web behavior. A passing client fixture is not evidence of a paid call, browser render or standalone native installation.
+The separate cross-repository gate uses the **actual official DSH CLI**, ordinary Web/base and Team profile, the newly built host tarball, a read-only in-memory credential provider and a bounded synthetic LLM adapter:
 
-## Release-runtime migration status
+```sh
+node plugins/dsh-agent-team/scripts/test-native-e2e.mjs /absolute/official-dsh-package /absolute/dsh-team-roles-0.5.0.tgz
+```
 
-The target is the exact npm runtime **`@deepseek-ai/dsh@0.2.2-alpha.2`** and the upstream plugin's **unreleased local 0.4.0 candidate** in [dsh-team-roles PR #4](https://github.com/silverbullet233/dsh-team-roles/pull/4). Upstream reported **88 passing tests** on that npm runtime: 52 unit, 25 native, five runtime and six release tests, with [green CI at commit 303eef0](https://github.com/silverbullet233/dsh-team-roles/actions/runs/40725213933). Coverage includes keyless native Lead/role-member creation, message follow-up, same-member reuse, SessionController/Gateway/projections/bindings, persistence restore, empty-role inheritance, Settings saves and service identity. Its built tarball was also installed and loaded through the released CLI in a fresh relocated profile without development links. The reported standalone acceptance used seven synthetic requests. These are upstream results; neither paid provider inference nor browser rendering was exercised by this migration.
+Run it in an isolated environment with PATH and locale only. It creates its own home/profile, installs the actual candidate and test-only native contribution, and checks real managed-Team creation, duplicate create, two native role members, same-member follow-up, result/completion, client disconnect, safe shutdown and cold persistent restart. It asserts that no persistent credential file was created. `--open --keep` is an explicit visual-validation option; the retained process/home must be cleaned up afterward. This gate is independent of ordinary CI's transport fixtures.
 
-The existing published `dsh-team-roles` **0.3.0** remains source-locked; these results do not make it compatible with alpha.2. The 0.4.0 version identifies a local candidate, not an existing public release or download URL. No global runtime/profile change, active Web restart, authentication change or paid inference is part of the local client cleanup.
+The host repository separately verifies role edits/cold recovery, running steer/stop, pending provisioning, admission/result evidence, lost replies, native Web creation and writer lifecycle. Browser claims require actual UI inspection. Live provider inference, billing and all arbitrary user plugin combinations are not certified by synthetic tests.
 
-The client already treats native runtime details as host-owned metadata. It requires `dsh-team-roles` IPC **1** and all five advertised capabilities, checks every response version, and retains private socket, exact invocation, size and identity checks. No DSH dependency, source SHA check, native import, source connector or release/source fallback is implemented in this client.
-
-The release-health regression passes `sourceSha: null` and `runtime.packageVersion: '0.2.2-alpha.2'` through actual MCP dispatch and private IPC fixtures, then verifies compatible work is admitted without changing caller arguments. This checks wire compatibility, not native execution.
-
-## Earlier validation
-
-Earlier integration evidence targeted host 0.3.0 with the official source build at `22ddee3792402c3e70ec5f86a63c3e3e895a2f60`. Split, socket/default-role and collection-layout checks are recorded in the [previous validation notes](https://github.com/silverbullet233/oh-my-codex/blob/6cef0698d18ada655f435539aa23a42f92fab3d0/plugins/dsh-agent-team/docs/validation.md). Those historical native/live results must not be presented as alpha.2 release-runtime results.
-
-`scripts/live/codex-e2e.mjs` remains an opt-in historical runner for a separately prepared, explicitly authorized synthetic fixture, including its `dsh-team-synthetic` preset and named roles. It requires a fixture `run.json`, uses `codex` from PATH or `DSH_TEAM_CODEX_COMMAND`, and the normal socket override. It is not a normal installation step or empty-catalog smoke test. Do not run it without inference authorization and complete payload auditing. It was not run for this cleanup. Unknown usage and fees remain unknown.
+Local acceptance completed with 18 catalog/release tests and 36 client tests, plus build, package inspection and isolated Codex install/upgrade/rollback/discovery. The real official-CLI gate passed with nine synthetic requests and two native role members, preserved identity through follow-up/disconnect/restart, and confirmed no persistent credential file. Earlier failed fixture attempts accidentally activated native file credentials due to a patch-name matching guard; their test-only browser grant files and isolated processes/homes were deleted without reading or reusing credential values. The corrected fixture preflights the composed credential rows before any start. No personal profile or provider credentials were used.

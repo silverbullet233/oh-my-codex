@@ -4,7 +4,7 @@ Independent Codex plugins and reusable skills. Each plugin is self-contained und
 
 | Plugin | Purpose | Setup |
 | --- | --- | --- |
-| DSH Agent Team | Explicit MCP client for the same native DSH Session service used by Web | [Getting started](plugins/dsh-agent-team/docs/getting-started.md) · [Plugin README](plugins/dsh-agent-team/README.md) |
+| DSH Agent Team | Codex-owned ordinary DSH Web host and native Team Gateway | [Getting started](plugins/dsh-agent-team/docs/getting-started.md) · [Plugin README](plugins/dsh-agent-team/README.md) |
 
 ## Install in Codex
 
@@ -15,16 +15,16 @@ codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git 
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-Start a new Codex session after installation. DSH Agent Team also requires a separately installed, compatible **running DSH Web host with `dsh-team-roles` loaded**. Installing this Codex plugin does not start DSH. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
+Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
 
-For a stable snapshot, replace `main` with a published semantic tag from [Releases](https://github.com/silverbullet233/oh-my-codex/releases). **`v0.1.0` is the initial candidate; it is not published by this change.** After that tag is available:
+For a stable snapshot, replace `main` with a published semantic tag from [Releases](https://github.com/silverbullet233/oh-my-codex/releases). **`v0.2.0` is the new candidate; it is not published by this change.** After that tag is available:
 
 ```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.1.0
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.2.0`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
+The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.3.0`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
 
 ## Update or roll back
 
