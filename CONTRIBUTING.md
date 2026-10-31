@@ -61,7 +61,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.3.0.tgz`.
+- Plugin tarballs, currently `dsh-agent-team-0.3.1.tgz`.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.

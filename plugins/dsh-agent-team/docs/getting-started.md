@@ -4,9 +4,9 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Install the pinned Codex catalog
 
-Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.0**. These are independent versions.
+Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.1**. These are independent versions.
 
-**Publication pending:** catalog **v0.2.0** and plugin **0.3.0** are release-preparation targets, not yet published installers. Use the fixed commands below only after the tag, successful release workflow and public assets are verified. The older published v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+**Release availability:** use the catalog **v0.2.0** / plugin **0.3.1** commands below only after that tag, successful release workflow and public assets are published and verified. While publication is pending, these commands are not an available installer; do not substitute a floating ref. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
 
 Use a Codex CLI that supports plugin marketplaces:
 
@@ -49,7 +49,9 @@ Setup claims an empty private home, saves the launch workspace, and uses that ex
 
 The two environment variables must be available to **Codex's MCP server process**. Exporting them in an unrelated terminal does not update an already running desktop app. Do not put launch tokens, API cookies or provider credentials in MCP configuration.
 
-Explicitly ask Codex to use DSH Agent Team. Call health first, inspect the returned catalog, then create:
+Explicitly ask Codex to use DSH Agent Team. Under the [orchestration contract](orchestration.md), main clarifies requirements/design, defines decomposition and acceptance, and delegates all implementation/testing/debugging to Lead. Main owns progress and independent read-only review; correction instructions go only to Lead. If Lead cannot proceed, main escalates to the user rather than taking over. Read-only member observations are allowed; direct member instructions are not. This is skill guidance, not global tool removal.
+
+Call health first, inspect the returned catalog, then create the Lead/root. The CLI example below demonstrates the same delegation boundary:
 
 ```sh
 node scripts/client.mjs create '{"key":"task-001","cwd":"/absolute/authorized/workspace","text":"The explicitly authorized task."}'

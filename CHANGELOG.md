@@ -4,8 +4,9 @@ Versions here describe the repository catalog. Each plugin has its own version.
 
 ## 0.2.0
 
-- DSH Agent Team 0.3.0 replaces private IPC with the official Node Connection/Typert Gateway.
+- DSH Agent Team 0.3.1 replaces private IPC with the official Node Connection/Typert Gateway.
 - Lazily manage a dedicated ordinary DSH Web host, preserve native persistent data across MCP disconnects and restart, and offer native Web handoff and guarded graceful shutdown.
+- Explicit activation makes Codex main responsible for requirements/design, decomposition, acceptance, progress and independent read-only review. All implementation/testing/debugging is delegated to DSH Lead; no direct member instructions or alternate Codex execution workers. Blocked Lead work escalates to the user. This is skill guidance, not a global sandbox.
 - Breaking: configure a dedicated home and the exact DSH 0.2.2-alpha.2 runtime; install the published host 0.5.0 release archive first. Socket configuration is removed.
 
 ## 0.1.0

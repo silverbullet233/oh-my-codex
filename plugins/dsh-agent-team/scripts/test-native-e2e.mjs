@@ -48,10 +48,14 @@ try {
   assert.equal(health.host.home, home); assert.equal(health.owned, true);
   const input = { key: 'native-e2e', cwd: workspace, text: 'CREATE_SYNTHETIC_TEAM: process only synthetic fixtures.' };
   const created = await owner.request('create', input); firstId = created.teamId;
+  assert.equal(created.sessionId, firstId);
   assert.equal((await owner.request('create', input)).teamId, firstId);
   await until(async () => (await owner.request('result', { teamId: firstId })).completed === true);
   const before = await owner.request('status', { teamId: firstId });
   assert.equal(before.members.length, 3); childIds = before.members.filter(member => member.name !== 'lead').map(member => member.memberId).sort();
+  assert.equal(before.team.members.find(member => member.id === firstId).role, 'lead');
+  assert.equal(before.members.find(member => member.memberId === firstId).name, 'lead');
+  await assert.rejects(owner.request('send', { teamId: childIds[0], inputId: 'member-target-denied', text: 'Synthetic member target must be refused.' }), { code: 'team-roles/UNKNOWN_TEAM' });
   await owner.close();
   await owner.request('send', { teamId: firstId, inputId: 'same-member-followup', text: 'FOLLOW_SAME: send only the synthetic follow-up.' });
   await until(async () => (await owner.request('result', { teamId: firstId })).completed === true);
@@ -68,7 +72,7 @@ try {
   await assert.rejects(access(join(home, '.credentials.yaml')), { code: 'ENOENT' });
   const rows = (await readFile(join(home, 'synthetic-requests.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
   assert(rows.length <= 24);
-  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, sameMember: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
+  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, leadRootVerified: true, memberSendRejected: true, sameMember: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
 } finally {
   await owner.close();
   if (!flags.includes('--keep')) {
