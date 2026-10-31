@@ -4,7 +4,11 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Install the pinned Codex catalog
 
-Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.0**. These are independent versions. Use a Codex CLI that supports plugin marketplaces:
+Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.0**. These are independent versions.
+
+**Publication pending:** catalog **v0.2.0** and plugin **0.3.0** are release-preparation targets, not yet published installers. Use the fixed commands below only after the tag, successful release workflow and public assets are verified. The older published v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+
+Use a Codex CLI that supports plugin marketplaces:
 
 ```sh
 codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0

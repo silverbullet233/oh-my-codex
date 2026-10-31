@@ -4,7 +4,7 @@ Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a *
 
 Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.5.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-Catalog **v0.2.0** contains this plugin at independent version **0.3.0**. Register the marketplace with that exact tag; do not use a floating ref.
+Catalog **v0.2.0** / plugin **0.3.0** are not yet published; this is release preparation. Use the pinned installation only after the tag and public assets are verified. The intended catalog contains this plugin at independent version **0.3.0**. Register the marketplace with that exact tag; do not use a floating ref.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
