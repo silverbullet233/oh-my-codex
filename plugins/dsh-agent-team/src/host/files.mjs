@@ -1,5 +1,5 @@
 import { constants } from 'node:fs';
-import { mkdir, lstat, open, rename, unlink } from 'node:fs/promises';
+import { mkdir, lstat, open, rename, unlink, realpath } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -40,18 +40,45 @@ export function birth(pid) {
 export async function removeIf(path, nonce) { if ((await readPrivate(path))?.instanceId === nonce) await unlink(path); }
 export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const lifecycleTails = new Map();
+
+/** Serialize every descriptor lifetime locally: closing any descriptor for an inode can drop POSIX locks. */
+async function locallySerialized(path, deadline, action) {
+  const prior = lifecycleTails.get(path) ?? Promise.resolve();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const tail = prior.then(() => gate);
+  lifecycleTails.set(path, tail);
+  let timer;
+  try {
+    await Promise.race([prior, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new ClientError('STARTUP_BUSY', 'Another owner is coordinating this host; retry after it settles.')), Math.max(0, deadline - Date.now()));
+    })]);
+    if (Date.now() > deadline) throw new ClientError('STARTUP_BUSY', 'Another owner is coordinating this host; retry after it settles.');
+    return await action();
+  } finally {
+    clearTimeout(timer);
+    // A timed-out waiter must stay behind its predecessor without opening SQLite.
+    prior.then(release);
+    tail.then(() => { if (lifecycleTails.get(path) === tail) lifecycleTails.delete(path); });
+  }
+}
+
 /** OS-owned coordination; a crashed caller cannot strand a lock file. */
 export async function withLifecycleLock(directory, timeoutMs, action) {
-  const path = join(directory, 'lifecycle.sqlite');
-  const file = await open(path, constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
-  try { const stat = await file.stat(); if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077)) throw new ClientError('UNSAFE_STATE', 'Lifecycle coordination requires a private file.'); } finally { await file.close(); }
-  const database = new DatabaseSync(path); database.exec('PRAGMA busy_timeout=0');
   const deadline = Date.now() + timeoutMs;
-  try {
-    while (true) {
-      try { database.exec('BEGIN IMMEDIATE'); break; }
-      catch (error) { if (!String(error.message).includes('locked')) throw error; if (Date.now() > deadline) throw new ClientError('STARTUP_BUSY', 'Another owner is coordinating this host; retry after it settles.'); await delay(25); }
-    }
-    try { return await action(); } finally { database.exec('ROLLBACK'); }
-  } finally { database.close(); }
+  const path = join(await realpath(directory), 'lifecycle.sqlite');
+  return locallySerialized(path, deadline, async () => {
+    const file = await open(path, constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
+    try { const stat = await file.stat(); if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077)) throw new ClientError('UNSAFE_STATE', 'Lifecycle coordination requires a private file.'); } finally { await file.close(); }
+    const database = new DatabaseSync(path);
+    try {
+      database.exec('PRAGMA busy_timeout=0');
+      while (true) {
+        try { database.exec('BEGIN IMMEDIATE'); break; }
+        catch (error) { if (!String(error.message).includes('locked')) throw error; if (Date.now() > deadline) throw new ClientError('STARTUP_BUSY', 'Another owner is coordinating this host; retry after it settles.'); await delay(25); }
+      }
+      try { return await action(); } finally { database.exec('ROLLBACK'); }
+    } finally { database.close(); }
+  });
 }
