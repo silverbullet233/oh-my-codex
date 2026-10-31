@@ -6,9 +6,10 @@ import { join, resolve } from 'node:path';
 const text = value => [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text: value }, { type: 'block-end', index: 0, block: { type: 'text', text: value } }, { type: 'finish', reason: { kind: 'stop' } }];
 const calls = entries => [...entries.flatMap(([name, args], index) => [{ type: 'block-start', index, blockType: 'tool-call' }, { type: 'tool-call-delta', index, id: `bounded-${index}`, name, argumentsDelta: JSON.stringify(args) }, { type: 'block-end', index, block: { type: 'tool-call', id: `bounded-${index}`, name, arguments: JSON.stringify(args) } }]), { type: 'finish', reason: { kind: 'tool-calls' } }];
 export default class FixtureCredentials extends CredentialProvider {
+  static inject = ['llm', 'agents', 'tools', 'agentTeams'];
   constructor(ctx) {
     super(ctx);
-    ctx.inject(['llm', 'agents', 'tools', 'agentTeams'], child => {
+    const child = ctx;
       let requests = 0; const followed = new Set();
       class Adapter extends LlmAdapter {
         async listModels(provider) { return [{ provider, id: 'fixture-model', name: 'Bounded native e2e fixture' }]; }
@@ -33,7 +34,6 @@ export default class FixtureCredentials extends CredentialProvider {
         if (agent.session.header.cwd !== resolve(process.env.DSH_HOME, 'fixture')) throw new Error('Synthetic e2e workspace mismatch');
         agent.options.maxTokens = 512; agent.ctx.tools.restrict({ allow: [] });
       }, { prepend: true });
-    });
   }
   async resolve() { return undefined; }
   async describe() { return { configured: false, writable: false }; }

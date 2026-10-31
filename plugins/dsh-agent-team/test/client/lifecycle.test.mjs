@@ -126,3 +126,73 @@ test('a delayed non-ready child retains startup attribution until graceful exit'
   assert.notEqual(healthy.host.pid, provisional.pid);
   assert.equal(birth(provisional.pid), null);
 });
+
+test('MCP death during startup releases coordination but preserves the same provisional native child', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  const cli = join(fixture.runtime, 'lib/bin.js');
+  const source = await readFile(cli, 'utf8');
+  await writeFile(cli, `await new Promise(resolve=>setTimeout(resolve,500)); await import(${JSON.stringify(new URL('../fixtures/owned-cli.mjs', import.meta.url).href)});`);
+  const { spawn } = await import('node:child_process');
+  const client = spawn(process.execPath, [new URL('../../src/mcp/main.mjs', import.meta.url).pathname], { env: fixture.env, stdio: ['pipe', 'pipe', 'pipe'] });
+  client.stdout.resume(); client.stderr.resume(); const exited = once(client, 'exit');
+  t.after(() => { if (client.exitCode === null && client.signalCode === null) client.kill('SIGKILL'); });
+  client.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }) + '\n' + JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } }) + '\n');
+  let provisional;
+  for (let i = 0; i < 200; i++) { provisional = await readPrivate(join(fixture.home, '.codex-owned/starting.json')); if (provisional?.pid) break; await delay(10); }
+  assert(provisional?.pid);
+  client.kill('SIGKILL'); await exited;
+  const health = await fixture.owner.request('health');
+  assert.equal(health.host.pid, provisional.pid);
+  assert.equal(await fixture.starts(), 1);
+});
+
+test('supervisor death without published child identity is uncertain and cannot create a second writer', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t); await fixture.owner.request('health');
+  const path = join(fixture.home, '.codex-owned/instance.json');
+  const actual = await readPrivate(path), supervisorBirth = birth(actual.supervisorPid);
+  const { unlink } = await import('node:fs/promises');
+  // Reproduce the durable crash cut after spawn authorization but before PID publication.
+  await writePrivate(join(fixture.home, '.codex-owned/starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'spawn-authorized', instanceId: actual.instanceId, supervisorPid: actual.supervisorPid, supervisorBirth });
+  await unlink(path);
+  const readyPath = join(fixture.home, '.codex-owned', `ready-${actual.instanceId}.json`);
+  await unlink(readyPath);
+  process.kill(actual.supervisorPid, 'SIGKILL');
+  for (let i = 0; i < 100 && birth(actual.supervisorPid); i++) await delay(10);
+  assert.equal(birth(actual.pid), actual.birth);
+  await assert.rejects(fixture.owner.request('health'), { code: 'STARTUP_UNCERTAIN' });
+  assert.equal(await fixture.starts(), 1);
+  // Restore this test's known child identity solely for guarded cleanup.
+  await writePrivate(readyPath, actual); await writePrivate(path, actual); await unlink(join(fixture.home, '.codex-owned/starting.json'));
+  assert.equal((await fixture.owner.shutdown()).stopped, true);
+});
+
+test('successor shutdown adopts ready startup metadata before guarding and stopping the actual host', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t); const health = await fixture.owner.request('health');
+  const { unlink } = await import('node:fs/promises'); await unlink(join(fixture.home, '.codex-owned/instance.json'));
+  const successor = new OwnedHost(fixture.config); t.after(() => successor.close());
+  const stopped = await successor.shutdown();
+  assert.equal(stopped.stopped, true); assert.notEqual(stopped.alreadyStopped, true);
+  assert.equal(birth(health.host.pid), null);
+});
+
+test('process attribution remains stable across caller timezone and locale changes', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t); const first = await fixture.owner.request('health');
+  const saved = { TZ: process.env.TZ, LC_ALL: process.env.LC_ALL, LANG: process.env.LANG };
+  const second = new OwnedHost(fixture.config); t.after(() => second.close());
+  try {
+    process.env.TZ = 'America/Los_Angeles'; process.env.LC_ALL = 'C'; process.env.LANG = 'C';
+    assert.equal((await second.request('health')).host.pid, first.host.pid);
+    process.env.TZ = 'Asia/Shanghai'; process.env.LC_ALL = 'zh_CN.UTF-8';
+    assert.equal((await fixture.owner.request('health')).host.pid, first.host.pid);
+    assert.equal(await fixture.starts(), 1);
+  } finally { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+});
+
+test('unversioned historical process timestamps cannot make a live host look stopped', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t); const health = await fixture.owner.request('health');
+  const path = join(fixture.home, '.codex-owned/instance.json'); const actual = await readPrivate(path);
+  await writePrivate(path, { ...actual, birthFormat: undefined, birth: 'ambiguous local date' });
+  await assert.rejects(fixture.owner.request('health'), { code: 'OWNERSHIP_MISMATCH' });
+  assert.equal(await fixture.starts(), 1); assert.equal(birth(health.host.pid), actual.birth);
+  await writePrivate(path, actual);
+});

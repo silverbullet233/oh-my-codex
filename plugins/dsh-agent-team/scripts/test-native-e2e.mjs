@@ -25,11 +25,21 @@ const run = (command, args, cwd = root) => {
 const pkg = join(root, 'fixture-package'); await mkdir(pkg);
 await copyFile(new URL('../test/fixtures/real-profile.mjs', import.meta.url), join(pkg, 'index.mjs'));
 await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: 'dsh-owned-test-fixture', version: '0.0.0', private: true, type: 'module', main: 'index.mjs', engines: { dsh: '0.2.2-alpha.2' }, dsh: { bundle: { patch: 'cordis.patch.yml' } } }));
-await writeFile(join(pkg, 'cordis.patch.yml'), JSON.stringify([{ id: 'credentials', name: 'dsh-owned-test-fixture', config: {} }]));
+await writeFile(join(pkg, 'cordis.patch.yml'), JSON.stringify([{ id: 'credentials', disabled: true }, { insert: [{ id: 'keyless-credentials', name: 'dsh-owned-test-fixture' }] }]));
 const packed = JSON.parse(run('npm', ['pack', '--offline', '--ignore-scripts', '--cache', join(root, 'cache'), '--json', '--pack-destination', root], pkg))[0];
 for (const spec of ['@deepseek-ai/dsh-experimental-agent-team-profile@0.2.2-alpha.2', await realpath(hostTarball), join(root, packed.filename)]) run(process.execPath, [runtime.cli, 'plugin', '--profile', 'web', 'add', spec, '--ignore-scripts']);
 const roles = ['lead', 'left', 'right'].map(name => ({ name, description: `Synthetic ${name} role`, instructions: `Use only synthetic ${name} task content and native Team coordination.`, provider: 'fixture-native', model: 'fixture-model' }));
 await writeFile(join(home, 'profiles/web/cordis.patch.yml'), JSON.stringify([{ id: 'session-title-llm', disabled: true }, { id: 'dsh-agent-team', config: { stateDirectory: join(home, 'role-state'), allowedRoots: [workspace], catalog: { leadRole: 'lead', roles } } }]));
+// Fail before any process starts if the test memory provider is not the effective composition.
+const nativeRequire = createRequire(runtime.anchor);
+const { loadProfileDirectory, composeEntries } = await import(nativeRequire.resolve('@deepseek-ai/dsh-app-boot'));
+const profile = loadProfileDirectory('dsh', join(home, 'profiles/web'), runtime.anchor);
+const warnings = [];
+const entries = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches], message => warnings.push(message));
+assert.equal(warnings.length, 0, 'Test profile must compose without skipped patches');
+assert.equal(entries.find(entry => entry.id === 'credentials').disabled, true);
+assert.equal(entries.find(entry => entry.id === 'keyless-credentials').name, 'dsh-owned-test-fixture');
+await assert.rejects(access(join(home, '.credentials.yaml')), { code: 'ENOENT' });
 const owner = new OwnedHost({ home, runtimeAnchor: runtime.anchor, profile: 'web', startupTimeoutMs: 20000 });
 let firstId, childIds, pid;
 const until = async check => { const deadline = Date.now() + 15000; while (Date.now() < deadline) { const value = await check(); if (value) return value; await delay(25); } throw new Error('Native e2e observation timed out'); };

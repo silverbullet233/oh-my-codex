@@ -3,10 +3,8 @@ import { promisify } from 'node:util';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { open, unlink, mkdir, readdir, realpath } from 'node:fs/promises';
-import { constants } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import { privateDirectory, readPrivate, writePrivate, birth, delay } from './files.mjs';
+import { privateDirectory, readPrivate, writePrivate, birth, delay, withLifecycleLock } from './files.mjs';
 import { loadRuntime } from '../native/runtime.mjs';
 import { GatewayClient } from '../native/gateway.mjs';
 import { ClientError } from '../native/errors.mjs';
@@ -36,37 +34,30 @@ export class OwnedHost {
   }
   async locked(action) {
     await this.prepare();
-    const path = join(this.directory, 'lifecycle.sqlite');
-    const file = await open(path, constants.O_RDWR | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
-    try { const stat = await file.stat(); if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077)) throw new ClientError('UNSAFE_STATE', 'Lifecycle coordination requires a private file.'); } finally { await file.close(); }
-    const database = new DatabaseSync(path);
-    database.exec('PRAGMA busy_timeout=0');
-    const deadline = Date.now() + this.config.startupTimeoutMs + 5000;
-    try {
-      while (true) {
-        try { database.exec('BEGIN IMMEDIATE'); break; }
-        catch (error) {
-          if (!String(error.message).includes('locked')) throw error;
-          if (Date.now() > deadline) throw new ClientError('STARTUP_BUSY', 'Another owner is starting or inspecting this host; retry after it settles.');
-          await delay(25);
-        }
-      }
-      try { return await action(); }
-      finally { database.exec('ROLLBACK'); }
-    } finally { database.close(); }
+    return withLifecycleLock(this.directory, this.config.startupTimeoutMs + 5000, action);
   }
   async pendingStart() {
     const path = join(this.directory, 'starting.json');
     const provisional = await readPrivate(path);
     if (!provisional) return false;
+    if (provisional.birthFormat !== 'utc-c-v1') throw new ClientError('STARTUP_UNCERTAIN', 'Older process attribution needs explicit inspection; no replacement writer was started.');
+    const ready = await readPrivate(join(this.directory, `ready-${provisional.instanceId}.json`));
+    const child = ready ?? provisional;
+    if (child.pid && (birth(child.pid) === null || birth(child.pid) !== child.birth)) { await unlink(path); return false; }
+    if (ready) {
+      if (ready.instanceId !== provisional.instanceId || ready.home !== this.config.home || ready.runtimeAnchor !== this.runtime.anchor) throw new ClientError('OWNERSHIP_MISMATCH', 'Provisional native host does not match this owned home.');
+      await writePrivate(join(this.directory, 'instance.json'), ready);
+      await unlink(path); return false;
+    }
     if (birth(provisional.supervisorPid) === provisional.supervisorBirth) return true;
-    if (provisional.pid && birth(provisional.pid) === provisional.birth) throw new ClientError('STARTUP_UNCERTAIN', 'An attributed child outlived its launcher before readiness; no second writer was started. Inspect the dedicated host.');
-    await unlink(path); return false;
+    if (!provisional.pid) throw new ClientError('STARTUP_UNCERTAIN', 'The attributed launcher exited after spawn authorization without publishing a child identity; no replacement writer was started. Inspect the dedicated host.');
+    throw new ClientError('STARTUP_UNCERTAIN', 'An attributed child outlived its launcher before readiness; no second writer was started. Inspect the dedicated host.');
   }
+
   async current() {
     const entry = await readPrivate(join(this.directory, 'instance.json'));
     if (!entry) return null;
-    if (entry.version !== 1 || entry.home !== this.config.home || entry.runtimeAnchor !== this.runtime.anchor || typeof entry.instanceId !== 'string') throw new ClientError('OWNERSHIP_MISMATCH', 'Owned host metadata does not match this runtime.');
+    if (entry.version !== 1 || entry.birthFormat !== 'utc-c-v1' || !Number.isSafeInteger(entry.pid) || entry.pid <= 0 || typeof entry.birth !== 'string' || !entry.birth || entry.home !== this.config.home || entry.runtimeAnchor !== this.runtime.anchor || typeof entry.instanceId !== 'string') throw new ClientError('OWNERSHIP_MISMATCH', 'Owned host metadata does not match this runtime.');
     if (birth(entry.pid) !== entry.birth) { await unlink(join(this.directory, 'instance.json')); return null; }
     return entry;
   }
@@ -74,16 +65,18 @@ export class OwnedHost {
     this.starting ??= this.locked(async () => {
       let entry = await this.current();
       const pendingDeadline = Date.now() + this.config.startupTimeoutMs + 5000;
-      while (!entry && await this.pendingStart()) {
+      while (!entry) {
+        const pending = await this.pendingStart(); entry = await this.current();
+        if (entry || !pending) break;
         if (Date.now() > pendingDeadline) throw new ClientError('STARTUP_PENDING', 'The attributed native host is still starting or stopping; no second writer was started.');
-        await delay(25); entry = await this.current();
+        await delay(25);
       }
       if (!entry) {
         const instanceId = randomUUID();
         const launchPath = join(this.directory, `launch-${instanceId}.json`);
         await writePrivate(launchPath, { ...this.config, cwd: this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId });
         const runner = spawn(process.execPath, [join(import.meta.dirname, 'runner.mjs'), this.directory, launchPath], { env: process.env, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
-        await writePrivate(join(this.directory, 'starting.json'), { version: 1, instanceId, supervisorPid: runner.pid, supervisorBirth: birth(runner.pid) });
+        await writePrivate(join(this.directory, 'starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'spawn-authorized', instanceId, supervisorPid: runner.pid, supervisorBirth: birth(runner.pid) });
         runner.send({ start: true });
         try { await new Promise((resolve_, reject) => {
           const timer = setTimeout(() => { runner.kill('SIGTERM'); reject(new ClientError('STARTUP_TIMEOUT', 'The owned native Web host did not become ready.')); }, this.config.startupTimeoutMs + 1000);
@@ -92,6 +85,8 @@ export class OwnedHost {
           runner.once('exit', () => finish(new ClientError('STARTUP_FAILED', 'The owned native Web process failed before readiness.')));
           runner.once('message', message => finish(message.ready ? null : new ClientError('STARTUP_FAILED', 'The owned native Web process failed before readiness.')));
         }); } finally { runner.unref(); if (runner.connected) runner.disconnect(); }
+        const ready = await readPrivate(join(this.directory, `ready-${instanceId}.json`));
+        if (ready) await writePrivate(join(this.directory, 'instance.json'), ready);
         entry = await this.current();
         if (!entry) throw new ClientError('STARTUP_FAILED', 'The owned host exited before readiness could be confirmed.');
       }
@@ -115,12 +110,15 @@ export class OwnedHost {
     return method === 'health' ? { ...value, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
   }
   async shutdown() {
-    return this.locked(async () => {
-      const entry = await this.current();
+    let supervisor;
+    const result = await this.locked(async () => {
+      let entry = await this.current();
       if (!entry) {
         if (await this.pendingStart()) return { stopped: false, reason: 'startup-in-progress' };
-        return { stopped: true, alreadyStopped: true };
+        entry = await this.current();
+        if (!entry) return { stopped: true, alreadyStopped: true };
       }
+      supervisor = { pid: entry.supervisorPid, birth: birth(entry.supervisorPid) };
       const client = new GatewayClient({ runtime: this.runtime, entry });
       try {
         await client.request('health');
@@ -135,6 +133,13 @@ export class OwnedHost {
         return { stopped: true };
       } finally { await client.close(); }
     });
+    // Exit cleanup needs the same coordination lock, so wait after releasing it.
+    if (result.stopped && supervisor?.birth) {
+      const deadline = Date.now() + 4000;
+      while (birth(supervisor.pid) === supervisor.birth && Date.now() < deadline) await delay(25);
+      if (birth(supervisor.pid) === supervisor.birth) return { ...result, cleanupPending: true };
+    }
+    return result;
   }
   async close() { await this.gateway?.close(); this.gateway = undefined; this.entry = undefined; }
 }

@@ -81,3 +81,33 @@ test('an explicit role refusal propagates through MCP without dropping the role 
   assert.equal(JSON.parse(response.result.content[0].text).code, 'team-roles/NATIVE_FAILURE');
   assert.deepEqual(calls, [{ method: 'health', params: {} }, { method: 'create', params }]);
 });
+
+test('concurrent calls await a gated reconnect before using the native Remote', { timeout: 15000 }, async t => {
+  const owned = await ownedFixture(t), entered = Promise.withResolvers(), release = Promise.withResolvers();
+  let block = true;
+  const server = await serveNativeFixture({ dispatch: async method => { if (method === 'health' && block) { block = false; entered.resolve(); await release.promise; } return {}; } });
+  const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
+  t.after(async () => { release.resolve(); await client.close(); await server.close(); });
+  const first = client.request('status', { teamId: 'first' }); await entered.promise;
+  let settled = false;
+  const second = client.request('status', { teamId: 'second' }).then(value => { settled = true; return value; });
+  await new Promise(resolve => setTimeout(resolve, 25)); assert.equal(settled, false);
+  release.resolve(); await Promise.all([first, second]);
+  assert.equal(client.invalid, false);
+});
+
+test('a dropped response after native admission is uncertain and never automatically replays a write', { timeout: 15000 }, async t => {
+  const owned = await ownedFixture(t);
+  let admitted = 0, response;
+  const server = await serveNativeFixture({ dispatch: async method => {
+    if (method === 'create') { admitted++; response.destroy(); return { accepted: true }; }
+    if (method === 'status') return { admitted };
+    return {};
+  } });
+  server.ctx.on('connection/request', (request, current, next) => { if (request.url === '/api/roleTeams/create') response = current; return next(); });
+  const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
+  t.after(async () => { await client.close(); await server.close(); });
+  await assert.rejects(client.request('create', { key: 'uncertain', cwd: owned.home, text: 'Synthetic accepted input.' }), { code: 'OUTCOME_UNCERTAIN' });
+  assert.equal(admitted, 1);
+  assert.equal((await client.request('status', { teamId: 'uncertain' })).admitted, 1);
+});
