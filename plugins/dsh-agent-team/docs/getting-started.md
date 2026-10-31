@@ -2,7 +2,22 @@
 
 The client starts its own ordinary Web host when first used. Perform one-time installation in a **new dedicated Harness home**; existing personal/global Web processes are never adopted or stopped.
 
-## Prepare the supported runtime and host candidate
+## Install the pinned Codex catalog
+
+Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.0**. These are independent versions.
+
+**Publication pending:** catalog **v0.2.0** and plugin **0.3.0** are release-preparation targets, not yet published installers. Use the fixed commands below only after the tag, successful release workflow and public assets are verified. The older published v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+
+Use a Codex CLI that supports plugin marketplaces:
+
+```sh
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0
+codex plugin add dsh-agent-team@oh-my-codex --json
+```
+
+The install result's `installedPath` is the plugin directory used below. Start a new Codex session after setup. Codex installs through the fixed Git marketplace tag, not directly from a Release tarball. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data. Do not register `main`, a feature branch or a floating latest ref for normal use.
+
+## Prepare the supported runtime and released host
 
 Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone:
 
@@ -12,30 +27,27 @@ export DSH_AGENT_TEAM_RUNTIME=/absolute/dsh-runtime/node_modules/@deepseek-ai/ds
 export DSH_AGENT_TEAM_HOME=/absolute/new-dedicated-dsh-home
 ```
 
-Build `dsh-team-roles` from the matching host branch (`npm ci --ignore-scripts --no-audit --no-fund`, `npm run build`, then `npm pack --pack-destination /absolute/output`). The resulting local file must actually exist. Host **0.5.0** and client **0.3.0** are unreleased candidates; published host 0.3.0 and main 0.4.0 are incompatible. Merge/release the host before a client release that requires it. These PRs do not publish tags, npm packages or Releases.
-
-From this plugin's source or installed directory:
+Download the built [host 0.5.0 release](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0), check its checksum, and keep the archive's absolute path. In a new download directory:
 
 ```sh
-node scripts/setup.mjs /absolute/output/dsh-team-roles-0.5.0.tgz /absolute/authorized/workspace
+curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.5.0/dsh-team-roles-0.5.0.tgz -o dsh-team-roles-0.5.0.tgz
+curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.5.0/SHA256SUMS -o SHA256SUMS
+shasum -a 256 -c SHA256SUMS
+dsh_host_archive="$(pwd)/dsh-team-roles-0.5.0.tgz"
+```
+
+From the `installedPath` returned by Codex, in the same terminal:
+
+```sh
+cd /absolute/installed-plugin-path
+node scripts/setup.mjs "$dsh_host_archive" /absolute/authorized/workspace
 node scripts/client.mjs health
 node scripts/client.mjs web
 ```
 
-Setup claims an empty private home, saves the launch workspace, and uses that exact CLI to install the ordinary Web profile, official Team bundle and actual host tarball. It does not launch a model or configure credentials. The first health lazily starts native Web; normal native first-run authentication/storage behavior belongs to DSH. Configure existing provider authentication and roles in native Web before submitting work. The launch workspace supplies the default native workspace allowlist; deployment changes remain native profile configuration.
+Setup claims an empty private home, saves the launch workspace, and uses that exact CLI to install the ordinary Web profile, official Team bundle and verified host tarball. It does not launch a model or configure provider credentials. The first health lazily starts native Web; normal native first-run authentication/storage behavior belongs to DSH. Configure existing provider authentication and roles in native Web before submitting work. The launch workspace supplies the default native workspace allowlist; deployment changes remain native profile configuration. Older host 0.3.0/0.4.0 use a different transport and are incompatible.
 
 The two environment variables must be available to **Codex's MCP server process**. Exporting them in an unrelated terminal does not update an already running desktop app. Do not put launch tokens, API cookies or provider credentials in MCP configuration.
-
-## Install the Codex candidate
-
-For development, use this repository's actual feature-branch ref until merged:
-
-```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref feat/owned-native-web-host
-codex plugin add dsh-agent-team@oh-my-codex
-```
-
-Start a new Codex session. After merge, select `main` or an actual published catalog tag. Codex installs through the Git marketplace, not directly from an npm archive. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data.
 
 Explicitly ask Codex to use DSH Agent Team. Call health first, inspect the returned catalog, then create:
 
@@ -61,7 +73,7 @@ Keep `teamId` and the create/input IDs. Send follow-ups to that Team rather than
 | --- | --- |
 | `RUNTIME_REQUIRED` / `RUNTIME_MISMATCH` | Point to the exact supported official package directory; no global upgrade is performed |
 | `SETUP_REQUIRED` / `UNOWNED_HOME` | Use setup with an empty dedicated home; never repurpose a personal live profile |
-| `CAPABILITY_MISMATCH` | Install the actual native-Gateway host candidate and matching official Team profile |
+| `CAPABILITY_MISMATCH` | Install the pinned native-Gateway host release and matching official Team profile |
 | `STARTUP_PENDING` / `STARTUP_UNCERTAIN` | Inspect that dedicated instance; a second writer is intentionally refused |
 | `OUTCOME_UNCERTAIN` | Retain the original key/input ID, reconnect, inspect status and retry only the same authorized content |
 | `SHUTDOWN_PENDING` | No force-kill was sent; inspect native work and retry after the fence expires |

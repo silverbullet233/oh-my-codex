@@ -10,19 +10,16 @@ Independent Codex plugins and reusable skills. Each plugin is self-contained und
 
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
-```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref main
-codex plugin add dsh-agent-team@oh-my-codex
-```
-
-Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
-
-For a stable snapshot, replace `main` with a published semantic tag from [Releases](https://github.com/silverbullet233/oh-my-codex/releases). **`v0.2.0` is the new candidate; it is not published by this change.** After that tag is available:
+**Publication pending:** catalog **v0.2.0** and plugin **0.3.0** are release-preparation targets, not yet published installers. Use the fixed commands below only after the tag, successful release workflow and public assets are verified. The older published v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
 
 ```sh
 codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0
 codex plugin add dsh-agent-team@oh-my-codex
 ```
+
+Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
+
+The version mapping for this release is **catalog v0.2.0 → dsh-agent-team 0.3.0**, paired with **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)** and exact DSH **0.2.2-alpha.2**. Normal installation uses the fixed catalog tag, never `main`, a feature branch or a floating latest ref. Check [Releases](https://github.com/silverbullet233/oh-my-codex/releases) before selecting another version.
 
 The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.3.0`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
 
@@ -35,15 +32,15 @@ codex plugin marketplace upgrade oh-my-codex
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-An immutable tag stays on that tag. To select a different published tag (or return to `main`), first remove the marketplace registration, then repeat the install commands with the desired `--ref`:
+An immutable tag stays on that tag. To select a different published tag, first remove the marketplace registration, then repeat the install commands with an explicit compatible version (the current pin is shown below):
 
 ```sh
 codex plugin marketplace remove oh-my-codex
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref main
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-This changes the catalog registration and selected plugin snapshot; it does not remove DSH data. Other plugins from this marketplace must also be reinstalled if you want them to use the selected snapshot. Start a new session afterward. The CLI rejects changing an existing marketplace's ref without removing its registration first.
+This changes the catalog registration and selected plugin snapshot; it does not remove DSH data. Other plugins from this marketplace must also be reinstalled if you want them to use the selected snapshot. Start a new session afterward. The CLI rejects changing an existing marketplace's ref without removing its registration first. An older catalog may require an older host/transport; verify that version's compatibility before rollback. Maintainers update these pins and their install verification with every release.
 
 ## Repository layout
 

@@ -149,7 +149,9 @@ test('MCP death during startup releases coordination but preserves the same prov
 });
 
 test('supervisor death without published child identity is uncertain and cannot create a second writer', { timeout: 15000 }, async t => {
-  const fixture = await ownedFixture(t); await fixture.owner.request('health');
+  const fixture = await ownedFixture(t);
+  await writeFile(join(fixture.runtime, 'lib/bin.js'), `process.env.DSH_FIXTURE_DIAGNOSTIC_TRIGGER='file'; await import(${JSON.stringify(new URL('../fixtures/owned-cli.mjs', import.meta.url).href)});`);
+  await fixture.owner.request('health');
   const path = join(fixture.home, '.codex-owned/instance.json');
   const actual = await readPrivate(path), supervisorBirth = birth(actual.supervisorPid);
   const { unlink } = await import('node:fs/promises');
@@ -160,7 +162,16 @@ test('supervisor death without published child identity is uncertain and cannot 
   await unlink(readyPath);
   process.kill(actual.supervisorPid, 'SIGKILL');
   for (let i = 0; i < 100 && birth(actual.supervisorPid); i++) await delay(10);
+  // Force a normal diagnostic after the carrier has died; logging must not kill the fixture.
+  await writeFile(join(fixture.home, 'emit-post-ready'), 'go');
+  let emitted = false;
+  for (let i = 0; i < 200 && birth(actual.pid); i++) {
+    try { await access(join(fixture.home, 'post-ready-emitted')); emitted = true; break; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await delay(10);
+  }
   assert.equal(birth(actual.pid), actual.birth);
+  assert.equal(emitted, true);
   await assert.rejects(fixture.owner.request('health'), { code: 'STARTUP_UNCERTAIN' });
   assert.equal(await fixture.starts(), 1);
   // Restore this test's known child identity solely for guarded cleanup.

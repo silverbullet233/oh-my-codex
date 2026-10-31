@@ -1,5 +1,5 @@
 /** Fake CLI process serves official Connection/Gateway with durable synthetic receipts. */
-import { readFile, writeFile, appendFile } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { serveNativeFixture } from './native-server.mjs';
 const home = process.env.DSH_HOME;
@@ -18,7 +18,17 @@ const server = await serveNativeFixture({ dispatch: async (method, request) => {
 const url = server.url;
 // Deliberately split output to test launch-line parsing. Capability never reaches test logs.
 process.stdout.write('Web: ' + url.slice(0, -8));
-setTimeout(() => process.stderr.write('Synthetic activation diagnostic\n'), 10);
+setTimeout(() => console.error('Synthetic activation diagnostic'), 10);
 setTimeout(() => process.stdout.write(url.slice(-8) + '\n'), 35);
-setTimeout(() => process.stderr.write('Synthetic post-ready diagnostic\n'), 150);
+// Console handles a closed diagnostic sink without killing this test-owned HTTP host.
+const emitPostReady = () => console.error('Synthetic post-ready diagnostic');
+if (process.env.DSH_FIXTURE_DIAGNOSTIC_TRIGGER === 'file') {
+  let emitted = false;
+  const timer = setInterval(async () => {
+    try { await access(join(home, 'emit-post-ready')); }
+    catch (error) { if (error.code === 'ENOENT') return; throw error; }
+    if (emitted) return; emitted = true; clearInterval(timer);
+    emitPostReady(); await writeFile(join(home, 'post-ready-emitted'), 'yes');
+  }, 10);
+} else setTimeout(emitPostReady, 150);
 process.on('SIGTERM', async () => { await server.close(); process.exit(0); });

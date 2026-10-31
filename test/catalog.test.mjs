@@ -40,3 +40,20 @@ test('workspace lock retains portable local links without developer-checkout dep
     assert(!entry.resolved.split('/').includes('..'), 'External development links must not enter the workspace lock.');
   }
 });
+
+test('normal installation guides pin the catalog version and versioned host release assets', async () => {
+  const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+  for (const file of ['README.md', 'plugins/dsh-agent-team/docs/getting-started.md']) {
+    const text = await readFile(join(root, file), 'utf8');
+    const refs = [...text.matchAll(/codex plugin marketplace add[^\n]*--ref ([^\s]+)/g)].map(row => row[1]);
+    assert(refs.length > 0);
+    assert(refs.every(ref => ref === `v${pkg.version}`), `${file} must follow the exact catalog version`);
+    assert(!text.includes('--ref feat/'));
+  }
+  const guide = await readFile(join(root, 'plugins/dsh-agent-team/docs/getting-started.md'), 'utf8');
+  const assets = [...guide.matchAll(/https:\/\/github\.com\/silverbullet233\/dsh-team-roles\/releases\/download\/([^/\s]+)\/([^\s]+)/g)];
+  assert.equal(assets.length, 2);
+  assert(assets.every(row => /^v\d+\.\d+\.\d+$/.test(row[1])));
+  assert.equal(new Set(assets.map(row => row[1])).size, 1);
+  assert(!guide.includes('releases/latest/'));
+});
