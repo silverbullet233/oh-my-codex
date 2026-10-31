@@ -4,7 +4,7 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Prepare the supported runtime and host candidate
 
-Use Node >=26.0.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone:
+Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone:
 
 ```sh
 npm install --prefix /absolute/dsh-runtime @deepseek-ai/dsh@0.2.2-alpha.2 --ignore-scripts

@@ -59,10 +59,12 @@ test('failed startup removes its lock and leaves no live attributed host; a late
   const fixture = await ownedFixture(t);
   const cli = join(fixture.runtime, 'lib/bin.js');
   const source = await readFile(cli, 'utf8');
-  await writeFile(cli, 'process.exit(2);');
+  const failedPid = join(fixture.home, 'failed-child-pid');
+  await writeFile(cli, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(failedPid)}, String(process.pid)); process.exit(2);`);
   await assert.rejects(fixture.owner.request('health'), { code: 'STARTUP_FAILED' });
   assert.equal(await readPrivate(join(fixture.home, '.codex-owned/starting.json')), null);
   assert.equal(await fixture.owner.current(), null);
+  assert.equal(birth(Number(await readFile(failedPid, 'utf8'))), null);
   await writeFile(cli, source);
   assert.equal((await fixture.owner.request('health')).ok, true);
 });

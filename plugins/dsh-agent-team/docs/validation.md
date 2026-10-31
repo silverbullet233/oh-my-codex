@@ -1,6 +1,6 @@
 # Validation scope
 
-Use Node 26.0.0, matching CI. Normal validation is keyless:
+Use Node 24.9.0, matching CI. Normal validation is keyless:
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -25,3 +25,7 @@ The host repository separately verifies role edits/cold recovery, running steer/
 Local acceptance completed with 18 catalog/release tests and 36 client tests, plus build, package inspection and isolated Codex install/upgrade/rollback/discovery. The real official-CLI gate passed with nine synthetic requests and two native role members, preserved identity through follow-up/disconnect/restart, and confirmed no persistent credential file. Earlier failed fixture attempts accidentally activated native file credentials due to a patch-name matching guard; their test-only browser grant files and isolated processes/homes were deleted without reading or reusing credential values. The corrected fixture preflights the composed credential rows before any start. No personal profile or provider credentials were used.
 
 Final Chrome acceptance opened the client-owned ordinary Web instance, created a bounded synthetic Team through native Settings, and observed the completed Session with the configured fixture model. Open Team closed Settings and selected that same Session. Reload and reopening retained the original request fields and Team receipt, with no horizontal dialog overflow. The attributed idle fixture shut down through the native activity guard, and its test-only home was removed.
+
+Node 24.9's built-in SQLite API emits its official experimental-status diagnostic on stderr. Production leaves it visible; protocol tests accept only that exact warning block and reject any other diagnostics while checking the original output for secrets. Confirmed failed startups wait for attributed supervisor cleanup after releasing lifecycle coordination; regression checks require removed metadata, a dead failed child and a successful clean restart.
+
+Compatibility acceptance on Node 24.9 repeated all 54 tests, build, package inspection, real Codex installation and release asset preparation. The actual official-CLI gate also passed on that runtime with eight bounded requests, two role members, persistent restart and no persistent credential file. The existing Node 24.9 CI workflow is unchanged.

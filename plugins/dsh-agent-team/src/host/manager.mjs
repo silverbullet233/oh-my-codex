@@ -62,6 +62,7 @@ export class OwnedHost {
     return entry;
   }
   async ensure() {
+    let failedRunner;
     this.starting ??= this.locked(async () => {
       let entry = await this.current();
       const pendingDeadline = Date.now() + this.config.startupTimeoutMs + 5000;
@@ -84,7 +85,7 @@ export class OwnedHost {
           runner.once('error', () => finish(new ClientError('STARTUP_FAILED', 'Could not launch the owned native Web process.')));
           runner.once('exit', () => finish(new ClientError('STARTUP_FAILED', 'The owned native Web process failed before readiness.')));
           runner.once('message', message => finish(message.ready ? null : new ClientError('STARTUP_FAILED', 'The owned native Web process failed before readiness.')));
-        }); } finally { runner.unref(); if (runner.connected) runner.disconnect(); }
+        }); } catch (error) { failedRunner = runner; throw error; } finally { runner.unref(); if (runner.connected) runner.disconnect(); }
         const ready = await readPrivate(join(this.directory, `ready-${instanceId}.json`));
         if (ready) await writePrivate(join(this.directory, 'instance.json'), ready);
         entry = await this.current();
@@ -94,6 +95,13 @@ export class OwnedHost {
       this.entry = entry;
       await this.gateway.request('health');
       return entry;
+    }).catch(async error => {
+      // The runner needs this lock for exit cleanup, so wait only after locked() releases it.
+      if (error.code === 'STARTUP_FAILED' && failedRunner?.pid) {
+        const deadline = Date.now() + 4000;
+        while (failedRunner.exitCode === null && failedRunner.signalCode === null && Date.now() < deadline) await delay(25);
+      }
+      throw error;
     }).finally(() => { this.starting = undefined; });
     return this.starting;
   }

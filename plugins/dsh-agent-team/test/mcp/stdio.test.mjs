@@ -1,3 +1,4 @@
+import { assertNativeDiagnostics } from '../fixtures/diagnostics.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -28,7 +29,7 @@ test('stdio EOF preserves its owned native host and a new MCP process reconnects
   let pid;
   for (let iteration = 0; iteration < 2; iteration++) {
     const result = await run(fixture.env, lines);
-    assert.equal(result.code, 0, result.stderr); assert.equal(result.stderr, '');
+    assert.equal(result.code, 0, result.stderr); assertNativeDiagnostics(result.stderr);
     const responses = result.stdout.trim().split('\n').map(JSON.parse);
     assert.equal(responses.length, 2);
     assert.equal(responses[1].result.structuredContent.api.version, 1);

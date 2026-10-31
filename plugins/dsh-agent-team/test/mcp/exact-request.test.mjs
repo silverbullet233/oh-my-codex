@@ -1,3 +1,4 @@
+import { assertNativeDiagnostics } from '../fixtures/diagnostics.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -107,7 +108,8 @@ test('stdio applies a valid invocation policy before a wrong request can reach i
     input: requests.map(request => JSON.stringify(request)).join('\n') + '\n', encoding: 'utf8',
   });
   assert.equal(result.status, 0);
-  assert.equal(result.stderr, '');
+  assertNativeDiagnostics(result.stderr);
+  assert.doesNotMatch(result.stdout + result.stderr, /token=|Cookie|DSH_OWNED_INSTANCE_ID/);
   const responses = result.stdout.trim().split('\n').map(JSON.parse);
   for (const response of responses.slice(1)) {
     assert.equal(response.result.isError, true);

@@ -2,7 +2,7 @@
 
 ## Development
 
-Use Node.js >=26.0.0 and npm. CI uses Node 26.0.0 on Ubuntu and macOS. The root npm package is private catalog tooling, not an installable plugin.
+Use Node.js >=24.9.0 and npm. CI uses Node 24.9.0 on Ubuntu and macOS. The root npm package is private catalog tooling, not an installable plugin.
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund

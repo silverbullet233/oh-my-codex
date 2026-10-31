@@ -8,7 +8,7 @@
     "./client": "./src/host/manager.mjs"
   },
   "engines": {
-    "node": ">=26.0.0"
+    "node": ">=24.9.0"
   },
   "bin": {
     "dsh-agent-team-mcp": "./src/mcp/main.mjs"

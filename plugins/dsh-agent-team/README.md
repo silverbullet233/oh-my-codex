@@ -2,7 +2,7 @@
 
 Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a **dedicated ordinary DSH Web host**, then connects through the official Node Connection/Typert Gateway. The native host owns role policy, immutable member snapshots, execution, persistence, tools and approvals. The client contains manifests, a skill, native API calls and process lifecycle management.
 
-Use Node **>=26.0.0**, exact official **DSH 0.2.2-alpha.2**, and the **unreleased dsh-team-roles 0.5.0 candidate**. Published host 0.3.0 and unpublished main 0.4.0 expose the old transport and are incompatible. Build/install the actual host candidate before this client; no candidate release URL is implied. No global daemon, SDK composition or private socket is used.
+Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and the **unreleased dsh-team-roles 0.5.0 candidate**. Published host 0.3.0 and unpublished main 0.4.0 expose the old transport and are incompatible. Build/install the actual host candidate before this client; no candidate release URL is implied. No global daemon, SDK composition or private socket is used.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
