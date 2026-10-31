@@ -2,6 +2,11 @@
 
 Versions here describe the repository catalog. Each plugin has its own version.
 
+## 0.2.1
+
+- DSH Agent Team 0.3.2 documents existing Git authentication for this private catalog and authenticated release-asset verification. Publishing a Release does not make a private repository public.
+- Keep the fixed catalog tag and public host 0.5.0 asset pins. The Lead orchestration behavior introduced in catalog 0.2.0 / plugin 0.3.1 is unchanged.
+
 ## 0.2.0
 
 - DSH Agent Team 0.3.1 replaces private IPC with the official Node Connection/Typert Gateway.

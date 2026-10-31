@@ -4,14 +4,18 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Install the pinned Codex catalog
 
-Catalog **v0.2.0** contains plugin **dsh-agent-team 0.3.1**. These are independent versions.
+Catalog **v0.2.1** contains plugin **dsh-agent-team 0.3.2**. These are independent versions.
 
-**Release availability:** use the catalog **v0.2.0** / plugin **0.3.1** commands below only after that tag, successful release workflow and public assets are published and verified. While publication is pending, these commands are not an available installer; do not substitute a floating ref. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+**Release availability:** use the catalog **v0.2.1** / plugin **0.3.2** commands below only after that tag is published, its release workflow succeeds and its assets are verified. While publication is pending, these commands are not an available installer; do not substitute a floating ref. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+
+This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
+
+For the catalog's supplementary assets, an already authenticated GitHub CLI can download the fixed release with `gh release download v0.2.1 --repo silverbullet233/oh-my-codex --dir /absolute/new-empty-download-directory`; verify its `SHA256SUMS`. Git authentication and GitHub CLI authentication are separate prerequisites. The host archive below is public and uses its exact versioned URLs.
 
 Use a Codex CLI that supports plugin marketplaces:
 
 ```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.0
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.1
 codex plugin add dsh-agent-team@oh-my-codex --json
 ```
 

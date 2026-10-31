@@ -14,7 +14,7 @@ export function createDispatcher(client) {
     try {
       if (request.method === 'initialize') {
         initialized = true;
-        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'dsh-agent-team', version: '0.3.1' } } };
+        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'dsh-agent-team', version: '0.3.2' } } };
       }
       if (request.method === 'ping') return { ...response, result: {} };
       if (!initialized) return { ...response, error: { code: -32002, message: 'Initialize the MCP connection first.' } };

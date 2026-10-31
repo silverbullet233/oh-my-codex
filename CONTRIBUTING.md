@@ -52,7 +52,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
-npm run release:prepare -- --tag v0.2.0 --output ./dist/release-v0.2.0
+npm run release:prepare -- --tag v0.2.1 --output ./dist/release-v0.2.1
 ```
 
 The example pins the intended catalog version; verify its version mapping and release authorization before tagging. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
@@ -61,7 +61,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.3.1.tgz`.
+- Plugin tarballs, currently `dsh-agent-team-0.3.2.tgz`.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.
@@ -91,6 +91,6 @@ The former root `src`, `scripts/client.mjs`, `plugin.json`, `mcp.json`, plugin s
 
 Normal installation must use a fixed, published catalog tag with `codex plugin marketplace add ... --ref vX.Y.Z`. Never use `main`, feature branches or floating latest refs as the normal installation source. The catalog version and each plugin version remain independent.
 
-For every authorized release, publish and verify the compatible host first. Use its actual explicit `releases/download/vX.Y.Z/...` archive and SHA256SUMS URLs; never invent asset URLs or substitute a source archive. Check compatibility and isolated installation against those downloaded bytes. Prepare/review any release-note or installation correction before the catalog tag so generated assets describe the actual owned-host behavior. After publication, verify the catalog's exact tag/commit, version mapping, public assets/checksums and a real isolated Codex install. Update all normal installation pins in the root README, plugin README, getting-started guide and generated release instructions together, with reviewed PRs and their CI. Keep the chosen fixed tag on refresh; users must deliberately switch to another verified published tag.
+For every authorized release, publish and verify the compatible host first. Use its actual explicit `releases/download/vX.Y.Z/...` archive and SHA256SUMS URLs; never invent asset URLs or substitute a source archive. Check compatibility and isolated installation against those downloaded bytes. Prepare/review any release-note or installation correction before the catalog tag so generated assets describe the actual owned-host behavior. After publication, verify the catalog's exact tag/commit, version mapping, published assets/checksums and a real isolated Codex install. Inspect repository visibility first: publication preserves private access. Verify public artifacts anonymously and private artifacts with the existing authorized GitHub flow; never widen visibility or credentials to make a test pass. Check that private Git installation uses an already authorized credential manager without copying tokens into the temporary Codex home. Update all normal installation pins in the root README, plugin README, getting-started guide and generated release instructions together, with reviewed PRs and their CI. Keep the chosen fixed tag on refresh; users must deliberately switch to another verified published tag.
 
 A release-preparation PR may name its intended catalog tag, but it must state that publication is pending until the reviewed main commit is tagged, its workflow succeeds and assets are verified. Do not claim that pending tag/assets are already published. This checklist is a lasting documentation convention, not permission for future merges, releases or daily-use deployment.

@@ -32,6 +32,8 @@ test('local preparation produces usable archives and matching checksums without 
   assert.equal(plan.catalogVersion, metadata.version);
   assert(plan.body.includes(`--ref ${metadata.tag}`), 'Release instructions must pin the catalog tag');
   assert(plan.body.includes('starts its own ordinary DSH Web host lazily'));
+  assert(plan.body.includes('Git must already authenticate an account with repository access'));
+  assert(plan.body.includes('a published Release does not make it public'));
   assert(!plan.body.includes('compatible running DSH host'));
   assert.equal(plan.plugins[0].version, metadata.plugins[0].version);
   assert.equal(plan.plugins[0].path, './plugins/dsh-agent-team');
