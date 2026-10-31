@@ -2,7 +2,7 @@ import { tools, methods, validateArguments } from './tools.mjs';
 
 const protocolVersions = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
-/** JSON-RPC dispatcher. The bridge, rather than the MCP connection, owns Session state. */
+/** JSON-RPC dispatcher. Native DSH, rather than the MCP connection, owns Session state. */
 export function createDispatcher(client) {
   let initialized = false;
   return async (request) => {
@@ -14,7 +14,7 @@ export function createDispatcher(client) {
     try {
       if (request.method === 'initialize') {
         initialized = true;
-        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'dsh-agent-team', version: '0.2.0' } } };
+        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'dsh-agent-team', version: '0.3.0' } } };
       }
       if (request.method === 'ping') return { ...response, result: {} };
       if (!initialized) return { ...response, error: { code: -32002, message: 'Initialize the MCP connection first.' } };
@@ -29,7 +29,7 @@ export function createDispatcher(client) {
         const result = await client.request(methods.get(definition.name), args);
         return { ...response, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } };
       } catch (error) {
-        return { ...response, result: { isError: true, content: [{ type: 'text', text: JSON.stringify({ code: error.code ?? 'bridge/unavailable', message: error.message }) }] } };
+        return { ...response, result: { isError: true, content: [{ type: 'text', text: JSON.stringify({ code: error.code ?? 'native/unavailable', message: error.message }) }] } };
       }
     } catch (error) {
       return { ...response, error: { code: -32603, message: error.message } };

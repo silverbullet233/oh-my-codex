@@ -11,7 +11,7 @@ npm run build
 npm run pack:check
 ```
 
-`npm test` covers catalog paths, release safeguards and the plugin suites. `npm run build` validates metadata and builds each workspace. `npm run pack:check` inspects package contents. No tests require a live model account. The Unix-socket fixtures need local socket permission.
+`npm test` covers catalog paths, release safeguards and the plugin suites. `npm run build` validates metadata and builds each workspace. `npm run pack:check` inspects package contents. No tests require a live model account. The official native transport fixtures need loopback listener permission.
 
 Each plugin owns its manifest, MCP entrypoints, skills, tests, docs and package metadata. Add its local source under `./plugins/<name>` in `.agents/plugins/marketplace.json`; paths are relative to the repository root. `${PLUGIN_ROOT}` must resolve inside the installed plugin package, independent of the checkout or current working directory. Standalone skills belong under `skills/<name>/` when added.
 
@@ -52,7 +52,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
-npm run release:prepare -- --tag v0.1.0 --output ./dist/release-v0.1.0
+npm run release:prepare -- --tag v0.2.0 --output ./dist/release-v0.2.0
 ```
 
 The tag above is the first candidate, not a claim that it exists remotely. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
@@ -61,7 +61,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.2.0.tgz`.
+- Plugin tarballs, currently `dsh-agent-team-0.3.0.tgz`.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.
