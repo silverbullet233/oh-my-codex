@@ -53,6 +53,19 @@ test('version, bundle and foreign-profile mismatches are refused without reinsta
     await assert.rejects(setup(f.options), { code: 'SETUP_INCOMPLETE' }); assert.equal(f.calls.length, 0);
   }
 });
+test('profile manifest symlinks stay inside the dedicated Home without changing foreign files', async t => {
+  const f = await fixture(t); await setup(f.options); f.calls.length = 0;
+  const manifest = join(f.home, 'profiles/web/package.json'), contents = await readFile(manifest, 'utf8');
+  const foreign = `${f.home}-foreign`; await mkdir(foreign, { mode: 0o700 });
+  const outside = join(foreign, 'package.json'); await writeFile(outside, contents);
+  await rm(manifest); await symlink(outside, manifest);
+  await assert.rejects(setup(f.options), { code: 'SETUP_INCOMPLETE' });
+  assert.equal(f.calls.length, 0); assert.equal(await readFile(outside, 'utf8'), contents);
+  const inside = join(f.home, 'profile-manifest.json'); await writeFile(inside, contents);
+  await rm(manifest); await symlink(inside, manifest);
+  assert.deepEqual(await setup(f.options), { reused: true });
+  assert.equal(f.calls.length, 0); assert.equal(await readFile(inside, 'utf8'), contents);
+});
 test('canonical workspaces match, but a changed workspace or a file cannot become the launch directory', async t => {
   const f = await fixture(t), alias = join(f.workspace, 'alias'); await symlink(f.workspace, alias);
   await setup({ ...f.options, workspace: alias });

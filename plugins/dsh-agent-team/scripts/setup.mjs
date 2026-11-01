@@ -18,7 +18,9 @@ async function verifyInstalled(home) {
   try {
     const web = await realpath(join(home, 'profiles/web'));
     if (!web.startsWith(`${home}/`)) throw new Error();
-    const manifest = JSON.parse(await readFile(join(web, 'package.json'), 'utf8'));
+    const manifestPath = await realpath(join(web, 'package.json'));
+    if (!manifestPath.startsWith(`${home}/`)) throw new Error();
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
     for (const [name, expected] of [[team, version], ['dsh-team-roles', '0.5.0']]) {
       const path = await realpath(join(web, 'node_modules', name, 'package.json'));
       if (!path.startsWith(`${home}/`)) throw new Error();
