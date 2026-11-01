@@ -22,6 +22,13 @@ For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It 
 | `result` | `dsh_team_result` | Output, processing and whole-Team completion evidence |
 | `stop` | `dsh_team_stop` | Request whole-Team interruption without rolling back files |
 | `shutdown` | `dsh_team_shutdown` | Gracefully stop only the attributed idle host after a native admission fence |
+| MCP only | `dsh_team_pending` | Refresh typed Lead questions and native authority events |
+| MCP only | `dsh_team_answer` | Main answers Lead questions within existing user authority |
+| MCP only | `dsh_team_escalate` | Mark a question for a user decision/input |
+| MCP only | `dsh_team_approval` | Separate explicit one-shot approval or denial |
+| MCP only | `dsh_team_wait` | Bounded native stream observation without token-by-token wakeups |
+
+The five interaction/wait tools are unreleased. See [Lead interactions](docs/interactions.md) for the main/Lead question loop, approval boundary and unsupported simultaneous Web interaction.
 
 From the installed plugin directory, `node scripts/client.mjs health` uses the same lifecycle as MCP. `mcp.json` resolves `${PLUGIN_ROOT}` inside the self-contained plugin, independent of the working directory. The installed plugin has no npm runtime dependency; it loads the exact official Node transport from the configured DSH installation.
 

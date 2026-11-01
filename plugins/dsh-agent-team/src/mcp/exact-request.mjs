@@ -25,14 +25,14 @@ export function createExactRequestClient(client, policy) {
   const expected = requestPolicy(policy);
   let teamId = expected.method === 'send' ? expected.params.teamId : null;
   return {
-    async request(method, params = {}) {
+    async request(method, params = {}, options = {}) {
       if (method === 'result') {
         if (teamId === null || !isDeepStrictEqual(params, { teamId })) throw denied();
-        return client.request(method, { teamId });
+        return client.request(method, { teamId }, options);
       }
       if (method !== expected.method || !isDeepStrictEqual(params, expected.params)) throw denied();
       // Forward the detached authorized values so caller mutation cannot change dispatch.
-      const result = await client.request(method, structuredClone(expected.params));
+      const result = await client.request(method, structuredClone(expected.params), options);
       if (method === 'create') {
         if (!object(result) || typeof result.teamId !== 'string' || !result.teamId.trim() || result.teamId.length > 256 || (teamId !== null && result.teamId !== teamId)) {
           throw new Error('The exact MCP request returned an invalid or changed Team identity.');

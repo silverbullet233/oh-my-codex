@@ -96,6 +96,17 @@ test('concurrent calls await a gated reconnect before using the native Remote', 
   assert.equal(client.invalid, false);
 });
 
+test('explicit close during a gated handshake cannot publish a replacement client', { timeout: 15000 }, async t => {
+  const owned = await ownedFixture(t), entered = Promise.withResolvers(), release = Promise.withResolvers();
+  const server = await serveNativeFixture({ dispatch: async method => { if (method === 'health') { entered.resolve(); await release.promise; } return {}; } });
+  const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
+  t.after(async () => { release.resolve(); await client.close(); await server.close(); });
+  const outcome = assert.rejects(client.request('health'), { code: 'CANCELLED' });
+  await entered.promise;
+  const closing = client.close(); release.resolve();
+  await closing; await outcome; assert.equal(client.ctx, undefined);
+});
+
 test('a dropped response after native admission is uncertain and never automatically replays a write', { timeout: 15000 }, async t => {
   const owned = await ownedFixture(t);
   let admitted = 0, response;

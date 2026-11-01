@@ -5,7 +5,7 @@ const protocolVersions = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'
 /** JSON-RPC dispatcher. Native DSH, rather than the MCP connection, owns Session state. */
 export function createDispatcher(client) {
   let initialized = false;
-  return async (request) => {
+  return async (request, options = {}) => {
     if (!request || typeof request !== 'object' || Array.isArray(request) || request.jsonrpc !== '2.0' || typeof request.method !== 'string' || (request.id !== undefined && typeof request.id !== 'string' && typeof request.id !== 'number' && request.id !== null)) {
       return { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid JSON-RPC request.' } };
     }
@@ -26,7 +26,7 @@ export function createDispatcher(client) {
       try { args = validateArguments(definition.inputSchema, request.params.arguments ?? {}); }
       catch (error) { return { ...response, error: { code: -32602, message: error.message } }; }
       try {
-        const result = await client.request(methods.get(definition.name), args);
+        const result = await client.request(methods.get(definition.name), args, options);
         return { ...response, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } };
       } catch (error) {
         return { ...response, result: { isError: true, content: [{ type: 'text', text: JSON.stringify({ code: error.code ?? 'native/unavailable', message: error.message }) }] } };

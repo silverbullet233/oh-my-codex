@@ -12,7 +12,7 @@ const server = await serveNativeFixture({ dispatch: async (method, request) => {
   if (method === 'create') { data.teams[request.key] ??= { teamId: request.key, sessionId: request.key }; data.active = request.text === 'hang'; await save(); return { ...data.teams[request.key], accepted: true, processed: null }; }
   if (method === 'stop') { data.active = false; await save(); return { accepted: true, quiescent: true }; }
   if (method === 'prepareShutdown' || method === 'activity') return { safeToStop: !data.active, leaseExpiresAt: Date.now() + 5000 };
-  if (method === 'status') return { teamId: request.teamId, runtimeState: data.active ? 'running' : 'idle' };
+  if (method === 'status') return { teamId: request.teamId, sessionId: request.teamId, runtimeState: data.active ? 'running' : 'idle' };
   return { accepted: true, completed: !data.active };
 } });
 const url = server.url;

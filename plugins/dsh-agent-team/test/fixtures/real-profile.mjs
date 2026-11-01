@@ -6,11 +6,11 @@ import { join, resolve } from 'node:path';
 const text = value => [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text: value }, { type: 'block-end', index: 0, block: { type: 'text', text: value } }, { type: 'finish', reason: { kind: 'stop' } }];
 const calls = entries => [...entries.flatMap(([name, args], index) => [{ type: 'block-start', index, blockType: 'tool-call' }, { type: 'tool-call-delta', index, id: `bounded-${index}`, name, argumentsDelta: JSON.stringify(args) }, { type: 'block-end', index, block: { type: 'tool-call', id: `bounded-${index}`, name, arguments: JSON.stringify(args) } }]), { type: 'finish', reason: { kind: 'tool-calls' } }];
 export default class FixtureCredentials extends CredentialProvider {
-  static inject = ['llm', 'agents', 'tools', 'agentTeams'];
+  static inject = ['llm', 'agents', 'tools', 'agentTeams', 'userQuestions', 'approval'];
   constructor(ctx) {
     super(ctx);
     const child = ctx;
-      let requests = 0; const followed = new Set();
+      let requests = 0; const followed = new Set(), interacted = new Set();
       class Adapter extends LlmAdapter {
         async listModels(provider) { return [{ provider, id: 'fixture-model', name: 'Bounded native e2e fixture' }]; }
         async resolveModel(provider, id) { if (id !== 'fixture-model') throw new Error('Unknown fixture model'); return { provider, id, name: 'Bounded native e2e fixture' }; }
@@ -20,6 +20,12 @@ export default class FixtureCredentials extends CredentialProvider {
           await appendFile(join(process.env.DSH_HOME, 'synthetic-requests.jsonl'), JSON.stringify({ sessionId: agent.id, provider: options.provider, model: options.model }) + '\n');
           const serialized = JSON.stringify(options.messages);
           const membership = child.agentTeams.tryMembership(agent);
+          if (membership?.role === 'lead' && serialized.includes('INTERACTION_BRIDGE') && !interacted.has(agent.id)) {
+            interacted.add(agent.id);
+            const answer = await child.userQuestions.ask({ agent, questions: [{ id: 'scope', question: 'Use the approved synthetic scope?', options: [{ label: 'existing' }, { label: 'new' }] }] });
+            const approval = await child.approval.request({ agent, toolName: 'synthetic-noop', callId: 'synthetic-authority', reason: 'No files or external resources are changed.' });
+            await appendFile(join(process.env.DSH_HOME, 'synthetic-interactions.jsonl'), JSON.stringify({ agentId: agent.id, answer, approval }) + '\n');
+          }
           if (membership?.role === 'lead') {
             const roster = child.agentTeams.listMembers(agent);
             const missing = ['left', 'right'].filter(role => !roster.some(member => member.name === `${role}-one`));

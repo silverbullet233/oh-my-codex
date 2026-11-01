@@ -50,6 +50,24 @@ test('malformed and oversized stdio input never runs a bridge operation', async 
   assert.match(oversized.stderr, /input limit/);
 });
 
+test('stdio wait does not hold stop behind its deadline and queued cancellation prevents mutation', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  const lines = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_create', arguments: { key: 'waiting', cwd: fixture.home, text: 'hang' } } },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_wait', arguments: { teamId: 'waiting', timeoutMs: 30000 } } },
+    { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'dsh_team_stop', arguments: { teamId: 'waiting' } } },
+    { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'dsh_team_send', arguments: { teamId: 'waiting', inputId: 'cancelled', text: 'Must not dispatch' } } },
+    { jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 5 } },
+  ].map(row => JSON.stringify(row)).join('\n') + '\n';
+  const result = await run(fixture.env, lines);
+  assert.equal(result.code, 0, result.stderr); assertNativeDiagnostics(result.stderr);
+  const responses = result.stdout.trim().split('\n').map(JSON.parse);
+  assert(responses.findIndex(r => r.id === 4) < responses.findIndex(r => r.id === 3));
+  assert.equal(responses.find(r => r.id === 3).result.structuredContent.reason, 'completed');
+  assert.equal(responses.find(r => r.id === 5).result.isError, true);
+});
+
 test('a long-running browser launcher cannot block the next serialized MCP health request', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   const bin = join(fixture.home, 'bin'); await mkdir(bin);

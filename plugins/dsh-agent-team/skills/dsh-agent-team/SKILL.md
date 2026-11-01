@@ -25,7 +25,7 @@ Do not spawn alternative Codex workers to bypass the team. Do not send instructi
 
 ## Design and delegation
 
-Use the eight dsh-agent-team MCP tools for native workflow control. Call health first: it lazily starts/reuses the dedicated ordinary Web host through official Connection/Typert Gateway. Require native business API 1 and advertised capabilities. Never adopt or stop unrelated user Web processes. If setup/runtime is missing, follow the bootstrap guide only with explicit initialization authorization; otherwise report the exact prerequisite. Do not modify global installations or personal profiles.
+Use the dsh-agent-team MCP tools for native workflow control. Call health first: it lazily starts/reuses the dedicated ordinary Web host through official Connection/Typert Gateway. Require native business API 1 and advertised capabilities. Never adopt or stop unrelated user Web processes. If setup/runtime is missing, follow the bootstrap guide only with explicit initialization authorization; otherwise report the exact prerequisite. Do not modify global installations or personal profiles.
 
 Before create, capture the objective, agreed requirements/system design, scope and constraints, task decomposition/dependencies, acceptance criteria, required tests/evidence and delivery expectations. Send that brief to Lead, who plans and performs the execution with native members. Do not turn decomposition into direct member messages.
 
@@ -39,8 +39,14 @@ Acceptance is separate from admitted input, processing, Lead completion and proc
 
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
+## Lead questions and approvals (unreleased)
+
+Use `dsh_team_wait` after delegation for meaningful changes, pending input or whole-Team completion; reuse its opaque baseline as `after`. Main is the default Lead question handler through `dsh_team_answer` with source=main, within the existing requirements and authority. For missing information, new decisions or expanded authority, mark `dsh_team_escalate`, ask the user in normal conversation and answer with source=user. Do not treat coordination answers as project implementation or direct teammate instructions.
+
+Use `dsh_team_pending` to refresh current delivery tokens after reconnect/cancellation; never automatically replay old affirmative answers. Questions and approvals are separate. `dsh_team_approval` permits one-shot approval only with explicit user authorization for that exact action; never blanket/always approve or invent authorization. A rostered member's native owner approval is an authority event, not a task instruction. Ordinary member conversation remains unavailable. Pending questions take priority over originating-turn completion, and submission/admission is distinct from processing. See [interaction details](../../docs/interactions.md) for bounds, receipts and native stream behavior. This bridge is not in the published v0.2.1 tag.
+
 ## Native Web and lifetime
 
-Codex uses native Web for observation and user approval handoff, not member instructions or execution that bypasses Lead. Never approve on the user's behalf or invent provider endpoints. dsh_team_web returns a clean origin; never expose launch tokens or API cookies.
+While Codex controls the Team, use native Web for observation/settings only. Sending Web messages or answering forwarded questions/approvals there is unsupported concurrent interaction; no Web/Codex arbitration is implemented. Native settlement still invalidates cancelled deliveries. Do not use Web for member instructions or execution that bypasses Lead. Never approve on the user's behalf or invent provider endpoints. dsh_team_web returns a clean origin; never expose launch tokens or API cookies.
 
 MCP EOF closes only the API Peer; native work continues. Stop addresses the whole Team without rolling back files or clearing inboxes; cancellation acceptance and observed quiescence differ. Use dsh_team_shutdown only when ending the owned instance is requested or appropriate: it refuses active/unknown work and gracefully signals only the attributed host. Retained startup/uncertain shutdown must not produce a second writer. See the getting-started and orchestration guides for the API boundary and version scope.
