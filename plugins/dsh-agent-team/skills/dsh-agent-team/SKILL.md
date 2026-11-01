@@ -35,6 +35,14 @@ Inspect the native role catalog. With an empty catalog, omit leadRole for native
 
 After every successful Team create, present `teamId` and the returned `web.url` to the user, including on an idempotent retry. With `web.scope=host`, label the link as the owned-host Web homepage, not a Team-specific page: pinned native Web has no supported Session permalink. Never invent a deep link or expose launch tokens, cookies or credentials. Displaying the URL does not authorize opening a browser; use the existing Web handoff only when requested or otherwise authorized.
 
+## Create-time permissions (unreleased)
+
+Omit `permissionPreset` to preserve native defaults. Only an explicit user selection permits passing an exact `health.permissionPresets.options[].value`, after checking the host advertises `create-permission-preset`. Inspect the catalog's actual sandboxMode/approvalPolicy; never infer them from the name or self-upgrade to avoid an approval. Published host 0.5.0 lacks this capability: stop on an explicit unsupported request, without dropping the field or changing pins.
+
+The host applies and verifies the selected preset on a fresh root before the first task/member, and returns effective `permissions` (preset, sandbox policy, approvalPolicy and sequence cut). Keep the same preset in identical create retries. Existing/restored Teams are checked read-only; mismatches or partially initialized Sessions stop without reapplying permissions. Inspect reserved IDs after failures rather than changing keys to bypass them. No global defaults or existing Teams are changed.
+
+Native `danger-full-access` normally bundles full sandbox access with approval `never`; configured bundles can differ. `never` denies actions that still require approval, not approve-all. New members snapshot the parent's sandbox and pin approval to `never`; later Lead changes do not update existing members. Workspace admission is not complete process confinement, and this preset grants no OS privilege escalation. Keep the separate explicit approval boundary intact. See [permission details](../../docs/orchestration.md#create-time-permissions-unreleased).
+
 ## Progress, review and acceptance
 
 Read status/result and Lead reports to track the whole Team, including read-only member observations. Ask Lead for implementation, test and debugging evidence; do not run those project commands yourself. Independently inspect the resulting changes and evidence against the design and acceptance criteria. Send concrete findings and correction requests only to Lead, require Lead to retest, and repeat review until acceptance. Distinguish tests reported by Lead from evidence personally inspected; do not claim a rerun that main did not perform.

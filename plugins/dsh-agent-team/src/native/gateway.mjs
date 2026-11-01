@@ -120,6 +120,10 @@ export class GatewayClient {
     if (method === 'answer') return this.interactions.answer(params);
     if (method === 'approval') return this.interactions.approval(params);
     if (method === 'escalate') return this.interactions.escalate(params);
+    if (method === 'create' && params.permissionPreset !== undefined
+      && !this.lastHealth.api.capabilities.includes('create-permission-preset')) {
+      throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support explicit create-time permission presets. No work was submitted; do not drop the requested preset or fall back.');
+    }
     if (method === 'stop') this.wake();
     try {
       const result = await this.ctx.remote.roleTeams[method](params);
@@ -127,7 +131,14 @@ export class GatewayClient {
         if (result.error.code?.startsWith('gateway/')) { this.invalid = true; throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain create/input IDs and inspect status before retrying.'); }
         throw new ClientError(result.error.code, result.error.message);
       }
-      if (method === 'health') verifyHealth(result.value, this.entry);
+      if (method === 'health') { verifyHealth(result.value, this.entry); this.lastHealth = result.value; }
+      if (method === 'create' && params.permissionPreset !== undefined) {
+        const actual = result.value?.permissions;
+        if (actual?.preset !== params.permissionPreset || !['read-only', 'workspace-write', 'danger-full-access'].includes(actual?.sandbox?.mode)
+          || !['ask', 'never'].includes(actual?.approvalPolicy) || !Number.isSafeInteger(actual?.asOfSeq)) {
+          throw new ClientError('OUTCOME_UNCERTAIN', 'Create did not return a valid effective permission snapshot. Retain the create key and inspect native state; do not retry with different permissions.');
+        }
+      }
       return method === 'health' ? this.healthValue(result.value) : result.value;
     } catch (error) {
       if (error instanceof ClientError) throw error;

@@ -16,6 +16,17 @@ const send = {
   text: 'Synthetic followup. Reuse existing teammate calc-left. Send it one native message asking it to send_message lead exactly REUSE_nonce once and then finish.',
 };
 
+test('permission preset is part of exact create authorization, including omission', async () => {
+  const params = { ...create, permissionPreset: 'danger-full-access' };
+  const { client, calls } = fixture({ method: 'create', params });
+  for (const change of [create, { ...params, permissionPreset: 'read-only' }]) await assert.rejects(client.request('create', change), /outside the authorized/);
+  await client.request('create', params);
+  assert.deepEqual(calls, [{ method: 'create', params }]);
+  const defaults = fixture({ method: 'create', params: create });
+  await assert.rejects(defaults.client.request('create', params), /outside the authorized/);
+  assert.deepEqual(defaults.calls, []);
+});
+
 function fixture(policy, response = { teamId: nativeTeam, accepted: true, processed: null }) {
   const calls = [];
   const raw = { request: async (method, params) => { calls.push({ method, params }); return response; } };
