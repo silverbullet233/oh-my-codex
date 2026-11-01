@@ -45,7 +45,10 @@ test('MCP forwards exact explicit preset and reports actual configured permissio
   assert.deepEqual(calls.filter(call => call.method === 'create'), [{ method: 'create', params }]);
 });
 test('missing or mismatched permission receipts stay uncertain without replays', async t => {
-  for (const permissions of [undefined, { preset: 'read-only', sandbox: { mode: 'read-only' }, approvalPolicy: 'ask', asOfSeq: 1 }]) await t.test(String(permissions?.preset), async t => {
+  const receipt = { preset: 'danger-full-access', sandbox: { mode: 'workspace-write', workspaceRoot: '/synthetic' }, approvalPolicy: 'ask', asOfSeq: 1 };
+  const malformedScopes = [undefined, '', 'relative', 42, '/bad\0root'].map(workspaceRoot => ({ ...receipt, sandbox: { mode: 'workspace-write', workspaceRoot } }));
+  malformedScopes.push({ ...receipt, sandbox: { ...receipt.sandbox, additionalWritableRoots: ['relative'] } });
+  for (const permissions of [undefined, { ...receipt, preset: 'read-only' }, ...malformedScopes]) await t.test(String(permissions?.sandbox?.workspaceRoot), async t => {
     const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'create-permission-preset'] }, createResult: { teamId: 'synthetic', permissions } });
     await assert.rejects(client.request('create', { key: 'permission-receipt', cwd: '/synthetic', text: 'Synthetic task.', permissionPreset: 'danger-full-access' }), { code: 'OUTCOME_UNCERTAIN' });
     assert.equal(calls.filter(call => call.method === 'create').length, 1);

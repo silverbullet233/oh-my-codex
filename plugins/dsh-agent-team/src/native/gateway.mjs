@@ -1,4 +1,5 @@
 import { once } from 'node:events';
+import { isAbsolute } from 'node:path';
 import { createTeamRemote } from './remote.mjs';
 import { ClientError } from './errors.mjs';
 import { InteractionQueue, untilAbort, aborted } from './interactions.mjs';
@@ -135,6 +136,9 @@ export class GatewayClient {
       if (method === 'create' && params.permissionPreset !== undefined) {
         const actual = result.value?.permissions;
         if (actual?.preset !== params.permissionPreset || !['read-only', 'workspace-write', 'danger-full-access'].includes(actual?.sandbox?.mode)
+          || typeof actual?.sandbox?.workspaceRoot !== 'string' || !isAbsolute(actual.sandbox.workspaceRoot) || actual.sandbox.workspaceRoot.includes('\0')
+          || (actual.sandbox.additionalWritableRoots !== undefined && (!Array.isArray(actual.sandbox.additionalWritableRoots)
+            || actual.sandbox.additionalWritableRoots.some(root => typeof root !== 'string' || !isAbsolute(root) || root.includes('\0'))))
           || !['ask', 'never'].includes(actual?.approvalPolicy) || !Number.isSafeInteger(actual?.asOfSeq)) {
           throw new ClientError('OUTCOME_UNCERTAIN', 'Create did not return a valid effective permission snapshot. Retain the create key and inspect native state; do not retry with different permissions.');
         }
