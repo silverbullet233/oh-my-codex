@@ -4,9 +4,9 @@ Versions here describe the repository catalog. Each plugin has its own version.
 
 ## Unreleased
 
-- Add a local-review bootstrap entry for an exact private DSH runtime, checksum-pinned host, staged dedicated Home setup and native health validation. Default MCP discovery uses plugin-owned metadata; explicit manual environments retain precedence.
-- Refuse incompatible/unowned state, retain failed attempts safely and verify reruns without reinstalling. No global configuration, credentials, marketplace registrations or published tags are changed.
-- Correct v0.2.1 availability documentation: the release was published on 2026-10-31. Bootstrap is not part of that tag; release/version bumps require a later explicit decision.
+- Add an Agent-facing bootstrap guide using the existing setup and explicit MCP environment configuration.
+- Guard setup workspace/ownership, reuse matching complete installations and refuse partial, incompatible or uncertain state without overwriting it.
+- Correct v0.2.1 availability documentation; the new guide and setup changes are not part of that published tag.
 
 ## 0.2.1
 

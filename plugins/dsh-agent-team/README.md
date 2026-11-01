@@ -10,7 +10,7 @@ This catalog repository is currently private. Git must already authenticate an a
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
-The new `node scripts/bootstrap.mjs /absolute/authorized/workspace` entry is an **unreleased local change**, absent from the published v0.2.1 snapshot. It installs a pinned private runtime and checksum-verified host through the existing setup/lifecycle code, then checks health. Its default private installation is discovered by MCP after restart, without terminal exports or global configuration edits. See the guide for isolation, reruns, custom-root configuration and the v0.2.1 manual path.
+For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and explicit MCP environment configuration. The guide and setup safety changes are unreleased; the published v0.2.1 tag keeps its manual installation flow.
 
 | CLI method | MCP tool | Purpose |
 | --- | --- | --- |

@@ -4,6 +4,8 @@
 
 Activation is explicit: ask Codex to use DSH Agent Team for the work. Merely discussing/updating the plugin does not activate it, and other Codex workflows remain unchanged.
 
+Before a Lead exists, explicit plugin-initialization authorization permits main to follow [the bootstrap guide](bootstrap.md) and run setup/health only. It does not authorize user-project execution, Team creation/inference, provider credential handling or teammate bypass. This initialization clarification is unreleased.
+
 The communication path is `User <-> Codex main <-> DSH Lead <-> team members`.
 
 | Owner | Responsibility |

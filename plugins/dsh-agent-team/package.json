@@ -31,7 +31,6 @@
     "mcp.json",
     "README.md",
     "LICENSE",
-    "scripts/setup.mjs",
-    "scripts/bootstrap.mjs"
+    "scripts/setup.mjs"
   ]
 }

@@ -63,3 +63,16 @@ test('MCP create/send keep the Lead root and never dispatch member fields or mes
   assert.equal(tools.length, 8);
   assert(tools.find(tool => tool.name === 'dsh_team_send').inputSchema.properties.teamId.description.includes('Lead/root'));
 });
+
+
+test('initialization permission is explicit, limited to setup/health and requires actual MCP connectivity', async () => {
+  const skill = await read('skills/dsh-agent-team/SKILL.md'), guide = await read('docs/bootstrap.md');
+  assert(skill.includes('Explicit user authorization to initialize this plugin'));
+  assert(skill.includes('../../docs/bootstrap.md'));
+  assert(skill.includes('does not authorize user-project implementation/testing/debugging'));
+  assert(skill.includes('provider credential handling or direct teammate instructions'));
+  assert(guide.includes('actual `dsh_team_health`'));
+  assert(guide.includes('CLI-only health is insufficient'));
+  assert(guide.includes('There is no auto-discovery'));
+  assert(guide.includes('e9f89b9e93e0c236005d3ad60c78ade3a548ba38f4b9b881bb9fb6378b5f5d61'));
+});

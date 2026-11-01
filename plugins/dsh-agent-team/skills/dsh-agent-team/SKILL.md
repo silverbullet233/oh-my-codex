@@ -1,6 +1,6 @@
 ---
 name: dsh-agent-team
-description: Use only when the user explicitly asks to run work through DSH Agent Team or continue a native DSH team session.
+description: Use only when the user explicitly asks to run work through DSH Agent Team or continue a native DSH team session, or explicitly initialize this plugin.
 ---
 
 # DSH Agent Team orchestration
@@ -8,6 +8,10 @@ description: Use only when the user explicitly asks to run work through DSH Agen
 ## Activation and limits
 
 This contract applies only to an explicitly activated DSH workflow. Discussing or modifying this plugin does not activate it. Outside that workflow, normal Codex behavior is unchanged. This is behavioral guidance: it does not remove Codex tools, install a global sandbox, change the normal model/subscription, or restrict the user's native Web access. The exposed MCP API has a managed Lead/root boundary; that is not global session tool enforcement.
+
+## Initialization before Lead exists
+
+Explicit user authorization to initialize this plugin permits Codex main to follow [the Agent bootstrap guide](../../docs/bootstrap.md), prepare its dedicated runtime/Home, and run setup/health before a Lead exists. This narrow initialization permission does not authorize user-project implementation/testing/debugging, work-Team creation, inference, provider credential handling or direct teammate instructions. Use explicit MCP environment values, restart the server and verify actual `dsh_team_health`; CLI health alone is insufficient. Reuse a matching healthy installation, and stop on mismatches or partial state. The guide/setup safety update is unreleased; do not claim it is present in the published v0.2.1 tag.
 
 ## Communication and ownership
 
@@ -21,7 +25,7 @@ Do not spawn alternative Codex workers to bypass the team. Do not send instructi
 
 ## Design and delegation
 
-Use the eight dsh-agent-team MCP tools for native workflow control. Call health first: it lazily starts/reuses the dedicated ordinary Web host through official Connection/Typert Gateway. Require native business API 1 and advertised capabilities. Never adopt or stop unrelated user Web processes. If setup/runtime is missing, report the exact prerequisite; do not modify global installations or personal profiles.
+Use the eight dsh-agent-team MCP tools for native workflow control. Call health first: it lazily starts/reuses the dedicated ordinary Web host through official Connection/Typert Gateway. Require native business API 1 and advertised capabilities. Never adopt or stop unrelated user Web processes. If setup/runtime is missing, follow the bootstrap guide only with explicit initialization authorization; otherwise report the exact prerequisite. Do not modify global installations or personal profiles.
 
 Before create, capture the objective, agreed requirements/system design, scope and constraints, task decomposition/dependencies, acceptance criteria, required tests/evidence and delivery expectations. Send that brief to Lead, who plans and performs the execution with native members. Do not turn decomposition into direct member messages.
 
