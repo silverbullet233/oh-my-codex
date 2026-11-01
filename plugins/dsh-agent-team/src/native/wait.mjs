@@ -14,12 +14,19 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
   const notify = () => { changed.resolve(); };
   const unsub = gateway.interactions.onChange(notify); gateway.waiters.add(notify);
   const view = async (readSignal) => {
-    aborted(readSignal);
-    await untilAbort(gateway.ready(), readSignal);
-    const status = await gateway.observation.managed(teamId, readSignal);
-    const result = nativeValue(await untilAbort(gateway.ctx.remote.roleTeams.result({ teamId }), readSignal));
-    await gateway.refreshPending(teamId, readSignal);
-    return { status, result };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      aborted(readSignal);
+      await untilAbort(gateway.ready(), readSignal); aborted(readSignal);
+      const ctx = gateway.ctx;
+      try {
+        const status = await gateway.observation.managed(teamId, readSignal);
+        const result = nativeValue(await untilAbort(ctx.remote.roleTeams.result({ teamId }), readSignal));
+        await gateway.refreshPending(teamId, readSignal);
+        if (ctx === gateway.ctx && !gateway.invalid) return { status, result };
+      } catch (error) { aborted(readSignal); if (ctx === gateway.ctx && !gateway.invalid) throw error; }
+      repaired = true;
+    }
+    throw new ClientError('GATEWAY_UNAVAILABLE', 'Native connection repeatedly changed during observation. Retry a bounded wait.');
   };
   const signature = current => digest({ instanceId: gateway.entry.instanceId,
     taskState: current.status.taskState, runtimeState: current.status.runtimeState, rootTurnState: current.status.rootTurnState,

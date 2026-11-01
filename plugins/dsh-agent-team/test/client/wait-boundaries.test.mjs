@@ -73,3 +73,26 @@ test('deadline coalescing preserves a meaningful change or stream replacement', 
     assert.equal(result.reason, 'changed'); assert.equal(result.resynchronized, mode === 'replacement'); assert.equal(streams.size, 0);
   });
 });
+
+test('connection replacement during a native read rebuilds the observation', async t => {
+  for (const interrupted of ['status', 'result']) await t.test(interrupted, async () => {
+    const { gateway, state, streams } = observation(); state.completed = true;
+    const readStatus = gateway.observation.managed, readResult = gateway.ctx.remote.roleTeams.result;
+    let replaced = false;
+    const replace = () => { replaced = true; gateway.ctx = { ...gateway.ctx }; return { code: 'gateway/cancelled', message: 'Old connection disposed' }; };
+    gateway.observation.managed = async (...args) => { if (interrupted === 'status' && !replaced) throw Object.assign(new Error(), replace()); return readStatus(...args); };
+    gateway.ctx.remote.roleTeams.result = async () => interrupted === 'result' && !replaced ? { ok: false, error: replace() } : readResult();
+    const result = await waitForTeam(gateway, { teamId: 'lead', timeoutMs: 1000 }, new AbortController().signal);
+    assert.equal(result.reason, 'completed'); assert.equal(result.resynchronized, true); assert.equal(streams.size, 0);
+  });
+});
+
+test('native read recovery is bounded and preserves current-connection refusals', async () => {
+  const { gateway } = observation(); let attempts = 0;
+  gateway.observation.managed = async () => { attempts++; throw Object.assign(new Error('Unknown Team'), { code: 'team-roles/UNKNOWN_TEAM' }); };
+  await assert.rejects(waitForTeam(gateway, { teamId: 'lead' }, new AbortController().signal), { code: 'team-roles/UNKNOWN_TEAM' });
+  assert.equal(attempts, 1); attempts = 0;
+  gateway.observation.managed = async () => { attempts++; gateway.ctx = { ...gateway.ctx }; throw new Error('Connection disposed'); };
+  await assert.rejects(waitForTeam(gateway, { teamId: 'lead' }, new AbortController().signal), { code: 'GATEWAY_UNAVAILABLE' });
+  assert.equal(attempts, 3);
+});
