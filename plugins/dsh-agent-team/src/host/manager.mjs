@@ -16,10 +16,14 @@ export async function initializeOwnedHome(home, cwd) {
   await mkdir(home, { recursive: true, mode: 0o700 }); await privateDirectory(home);
   const marker = join(home, '.codex-dsh-owner.json');
   const prior = await readPrivate(marker);
-  if (prior) { if (prior.owner !== 'oh-my-codex/dsh-agent-team' || prior.version !== 1) throw new ClientError('UNOWNED_HOME', 'This home belongs to another application.'); return prior; }
+  if (prior) { if (prior.owner !== 'oh-my-codex/dsh-agent-team' || prior.version !== 1) throw new ClientError('UNOWNED_HOME', 'This home belongs to another application.'); return { ...prior, created: false }; }
   if ((await readdir(home)).length) throw new ClientError('UNOWNED_HOME', 'Use an empty dedicated Harness home; existing user profiles cannot be claimed.');
   const value = { version: 1, owner: 'oh-my-codex/dsh-agent-team', cwd: await realpath(cwd) };
-  await writePrivate(marker, value); return value;
+  let file;
+  try { file = await open(marker, 'wx', 0o600); }
+  catch (error) { if (error.code === 'EEXIST') return initializeOwnedHome(home, cwd); throw error; }
+  try { await file.writeFile(JSON.stringify(value)); await file.sync(); } finally { await file.close(); }
+  return { ...value, created: true };
 }
 /** One owned ordinary Web host, reused across disposable MCP connections. */
 export class OwnedHost {

@@ -6,7 +6,7 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 Catalog **v0.2.1** contains plugin **dsh-agent-team 0.3.2**. These are independent versions.
 
-**Release availability:** use the catalog **v0.2.1** / plugin **0.3.2** commands below only after that tag is published, its release workflow succeeds and its assets are verified. While publication is pending, these commands are not an available installer; do not substitute a floating ref. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+**Published release:** catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31** and passed GitHub Actions release validation. The fixed tag below is available to authorized repository users. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
@@ -21,7 +21,11 @@ codex plugin add dsh-agent-team@oh-my-codex --json
 
 The install result's `installedPath` is the plugin directory used below. Start a new Codex session after setup. Codex installs through the fixed Git marketplace tag, not directly from a Release tarball. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data. Do not register `main`, a feature branch or a floating latest ref for normal use.
 
-## Prepare the supported runtime and released host
+## Agent-guided initialization
+
+Ask your AI Agent to follow [the bootstrap guide](bootstrap.md). It coordinates the existing explicit runtime/Home configuration, verified host download, setup and health checks; there is no separate bootstrap installer or automatic MCP discovery. The guide and setup repeat-safety changes are unreleased and are not part of the immutable v0.2.1 tag. The published tag uses the manual steps below.
+
+## Prepare the supported runtime and released host (v0.2.1 manual path)
 
 Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone:
 
@@ -51,7 +55,7 @@ node scripts/client.mjs web
 
 Setup claims an empty private home, saves the launch workspace, and uses that exact CLI to install the ordinary Web profile, official Team bundle and verified host tarball. It does not launch a model or configure provider credentials. The first health lazily starts native Web; normal native first-run authentication/storage behavior belongs to DSH. Configure existing provider authentication and roles in native Web before submitting work. The launch workspace supplies the default native workspace allowlist; deployment changes remain native profile configuration. Older host 0.3.0/0.4.0 use a different transport and are incompatible.
 
-The two environment variables must be available to **Codex's MCP server process**. Exporting them in an unrelated terminal does not update an already running desktop app. Do not put launch tokens, API cookies or provider credentials in MCP configuration.
+The two environment variables must be available to **Codex's MCP server process**. Restart that server and call its actual `dsh_team_health`; CLI health alone does not confirm MCP connectivity. Exporting them in an unrelated terminal does not update an already running desktop app. Do not put launch tokens, API cookies or provider credentials in MCP configuration.
 
 Explicitly ask Codex to use DSH Agent Team. Under the [orchestration contract](orchestration.md), main clarifies requirements/design, defines decomposition and acceptance, and delegates all implementation/testing/debugging to Lead. Main owns progress and independent read-only review; correction instructions go only to Lead. If Lead cannot proceed, main escalates to the user rather than taking over. Read-only member observations are allowed; direct member instructions are not. This is skill guidance, not global tool removal.
 

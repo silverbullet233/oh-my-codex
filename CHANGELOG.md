@@ -2,6 +2,12 @@
 
 Versions here describe the repository catalog. Each plugin has its own version.
 
+## Unreleased
+
+- Add an Agent-facing bootstrap guide using the existing setup and explicit MCP environment configuration.
+- Guard setup workspace/ownership, reuse matching complete installations and refuse partial, incompatible or uncertain state without overwriting it.
+- Correct v0.2.1 availability documentation; the new guide and setup changes are not part of that published tag.
+
 ## 0.2.1
 
 - DSH Agent Team 0.3.2 documents existing Git authentication for this private catalog and authenticated release-asset verification. Publishing a Release does not make a private repository public.

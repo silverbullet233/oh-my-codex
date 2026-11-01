@@ -4,11 +4,13 @@ Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a *
 
 Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.5.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-Use catalog **v0.2.1** / plugin **0.3.2** only after the tag is published, its release workflow succeeds and its assets are verified; while publication is pending, the pin is not an available installer. The catalog and plugin versions are independent. Register the marketplace with that exact tag; do not use a floating ref.
+Catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31** and passed GitHub Actions release validation. The catalog and plugin versions are independent. Register the marketplace with that exact tag; do not use a floating ref.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
+
+For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and explicit MCP environment configuration. The guide and setup safety changes are unreleased; the published v0.2.1 tag keeps its manual installation flow.
 
 | CLI method | MCP tool | Purpose |
 | --- | --- | --- |
