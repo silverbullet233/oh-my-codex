@@ -8,6 +8,8 @@ Before a Lead exists, explicit plugin-initialization authorization permits main 
 
 The communication path is `User <-> Codex main <-> DSH Lead <-> team members`.
 
+Codex main and DSH Lead must communicate in English, including task briefs, follow-up questions/instructions, review feedback, free-text answers and Lead replies. Main includes `Communicate with Codex main in English.` in initial briefs and follow-up instructions. Keep code, paths, symbols, exact IDs/option values and necessary original-language quotations unchanged. This unreleased language contract is behavioral guidance; the runtime does not detect or translate language.
+
 | Owner | Responsibility |
 | --- | --- |
 | User and Codex main | Requirements, system design and material scope decisions |

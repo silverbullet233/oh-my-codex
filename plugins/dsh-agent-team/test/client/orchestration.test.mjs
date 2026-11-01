@@ -38,6 +38,29 @@ test('contract permits observations and honestly distinguishes guidance from glo
   assert(docs.includes('not Codex main'));
 });
 
+test('main/Lead English guidance preserves structured values and original quoted material', async () => {
+  const skill = await read('skills/dsh-agent-team/SKILL.md'), docs = await read('docs/orchestration.md');
+  assert(skill.includes('All communication between Codex main and DSH Lead must be in English'));
+  for (const source of [skill, docs]) {
+    assert(source.includes('Communicate with Codex main in English.'));
+    assert(source.includes('original-language quotations'));
+    assert(source.includes('behavioral'));
+  }
+  for (const name of ['dsh_team_create', 'dsh_team_send', 'dsh_team_answer']) assert(tools.find(tool => tool.name === name).description.includes('English'));
+  const calls = [], dispatch = createDispatcher({ request: async (method, params) => { calls.push({ method, params }); return { accepted: true }; } });
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const brief = 'Communicate with Codex main in English. Fix `模块_α` in `/tmp/项目/src.ts`; original error: "权限不足".';
+  const inputs = [
+    ['dsh_team_create', { key: '任务-1', cwd: '/tmp/项目', text: brief }],
+    ['dsh_team_send', { teamId: '会话-1', inputId: '跟进-1', text: brief }],
+    ['dsh_team_answer', { teamId: '会话-1', interactionId: '交互-1', deliveryId: '投递-1', source: 'user', answers: [{ id: '问题-1', selected: ['现有选项'] }, { id: '问题-2', selected: [], custom: 'Use `/tmp/项目`; preserve the quoted message "权限不足".' }] }],
+  ];
+  for (const [index, [name, args]] of inputs.entries()) {
+    const response = await dispatch({ jsonrpc: '2.0', id: index + 2, method: 'tools/call', params: { name, arguments: args } });
+    assert.equal(response.result?.isError, undefined); assert.deepEqual(calls[index].params, args);
+  }
+});
+
 test('MCP create/send keep the Lead root and never dispatch member fields or message tools', async () => {
   const root = 'synthetic-lead-root', calls = [];
   const dispatch = createDispatcher({ async request(method, params) {

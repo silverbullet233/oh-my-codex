@@ -17,6 +17,8 @@ Explicit user authorization to initialize this plugin permits Codex main to foll
 
 The communication path is `User <-> Codex main <-> DSH Lead <-> team members`.
 
+All communication between Codex main and DSH Lead must be in English: task briefs/create/send text, follow-up instructions and questions, review feedback, structured free-text answers, and Lead reports/questions/replies. Include `Communicate with Codex main in English.` in initial briefs and follow-up instructions. If Lead replies in another language, remind the same Lead/root to use English. Preserve code, paths, symbols, exact machine identifiers/option values and necessary original-language quotations verbatim; write the surrounding prose in English. Never translate structured answer IDs or selected option labels. This is a behavioral contract, not runtime language detection or automatic translation.
+
 Codex main communicates with the user, clarifies requirements and system design, defines task decomposition and acceptance criteria, checks progress, performs independent read-only review, and drives Lead corrections until acceptance. Reuse decisions and authorization already supplied; clarify only material missing information instead of asking for repeated confirmation.
 
 Delegate all implementation, testing and debugging to DSH Lead. Lead owns execution and coordinates team members. Do not implement, run project tests or debug the project yourself. Do not edit project files, apply patches or run project build/reproduction commands as a shortcut. Read-only inspection of source, diffs, logs and artifacts is allowed for design and independent review; inspection does not authorize execution edits.
