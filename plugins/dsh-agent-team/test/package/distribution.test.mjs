@@ -40,6 +40,8 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } },
   ].map(row => JSON.stringify(row)).join('\n') + '\n';
   for (const directory of [pluginRoot, join(pluginRoot, 'dist/dsh-agent-team'), packagedRoot]) {
+    const help = await run(process.execPath, [join(directory, 'scripts/bootstrap.mjs'), '--help'], { cwd: root });
+    assert(help.includes('--root'));
     const config = JSON.parse(await readFile(join(directory, 'mcp.json'), 'utf8')).mcpServers['dsh-agent-team'];
     const expand = value => value.replaceAll('${PLUGIN_ROOT}', directory);
     assert.equal(expand(config.cwd), directory);

@@ -10,7 +10,7 @@ Independent Codex plugins and reusable skills. Each plugin is self-contained und
 
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
-**Release availability:** use the catalog **v0.2.1** / plugin **0.3.2** commands below only after that tag is published, its release workflow succeeds and its assets are verified. While publication is pending, these commands are not an available installer; do not substitute a floating ref. The older v0.1.0 catalog contains the legacy plugin and does not install this native-Gateway client.
+**Published release:** catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31** and passed its GitHub Actions release validation. The fixed-tag commands below are available to authorized repository users. The older v0.1.0 catalog contains the legacy plugin.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
@@ -20,6 +20,8 @@ codex plugin add dsh-agent-team@oh-my-codex
 ```
 
 Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
+
+The [bootstrap workflow](plugins/dsh-agent-team/docs/getting-started.md#bootstrap-unreleased-local-change) is a local, unreleased addition. It is not included in v0.2.1; that published tag still uses the manual setup below. No release tag or marketplace pin is changed by this work.
 
 The version mapping for this release is **catalog v0.2.1 → dsh-agent-team 0.3.2**, paired with **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)** and exact DSH **0.2.2-alpha.2**. Normal installation uses the fixed catalog tag, never `main`, a feature branch or a floating latest ref. Check [Releases](https://github.com/silverbullet233/oh-my-codex/releases) before selecting another version.
 

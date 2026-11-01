@@ -9,6 +9,7 @@ import { GatewayClient } from '../native/gateway.mjs';
 import { ClientError } from '../native/errors.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
+import { discoverBootstrap } from '../bootstrap/config.mjs';
 export function configuration(env = process.env) {
   return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000 };
 }
@@ -23,8 +24,9 @@ export async function initializeOwnedHome(home, cwd) {
 }
 /** One owned ordinary Web host, reused across disposable MCP connections. */
 export class OwnedHost {
-  constructor(config = configuration()) { this.config = config; }
+  constructor(config) { this.config = config; }
   async prepare() {
+    this.config ??= await discoverBootstrap() ?? configuration();
     this.runtime ??= await loadRuntime(this.config.runtimeAnchor);
     this.config.home = await realpath(this.config.home);
     const marker = await readPrivate(join(this.config.home, '.codex-dsh-owner.json'));
