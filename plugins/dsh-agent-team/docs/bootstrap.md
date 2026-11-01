@@ -1,10 +1,10 @@
 # Bootstrap instructions for an AI Agent
 
-Use this guide only when the user explicitly authorizes plugin initialization. Codex main may prepare the plugin and check health before a DSH Lead exists. This does not authorize user-project work, direct teammate instructions, work-Team creation or inference. Do not handle provider credentials. The guide and new setup guards are unreleased; published catalog **v0.2.1 / plugin 0.3.2** (2026-10-31) retains its existing manual setup. Never change its tag or register a floating marketplace ref.
+Use this guide only when the user explicitly authorizes plugin initialization. Codex main may prepare the plugin and check health before a DSH Lead exists. This does not authorize user-project work, direct teammate instructions, work-Team creation or inference. Do not handle provider credentials. This guide targets catalog **v0.3.0 / plugin 0.4.0**. Published catalog v0.2.1 (2026-10-31) retains its manual setup; never change an existing tag or register a floating marketplace ref.
 
 1. **Inspect and reuse first.** Locate the installed plugin, authorized launch workspace and existing per-MCP `DSH_AGENT_TEAM_RUNTIME` / `DSH_AGENT_TEAM_HOME` values. Check Node **>=24.9.0** and npm. Do not install/upgrade global Node or DSH. Missing Node/npm requires the user's existing Node manager or a supported executable. Never print secrets or copy personal profiles/configuration.
 
-2. **Validate any existing installation.** Require exact `@deepseek-ai/dsh@0.2.2-alpha.2`, Team Profile `0.2.2-alpha.2` and host `0.5.0`. Check the private Home's `.codex-dsh-owner.json` (`version: 1`, `owner: oh-my-codex/dsh-agent-team`) and matching canonical workspace, and the installed Web profile/package versions. Call actual MCP `dsh_team_health` when available: require native API 1, required capabilities and the attributed owned Home/runtime. Reuse an already matching healthy installation. A version, ownership, workspace or configuration mismatch is a stop condition; do not upgrade or repurpose it automatically.
+2. **Validate any existing installation.** Require exact `@deepseek-ai/dsh@0.2.2-alpha.2`, Team Profile `0.2.2-alpha.2` and host `0.6.0`. Check the private Home's `.codex-dsh-owner.json` (`version: 1`, `owner: oh-my-codex/dsh-agent-team`) and matching canonical workspace, and the installed Web profile/package versions. Call actual MCP `dsh_team_health` when available: require native API 1, required capabilities and the attributed owned Home/runtime. Reuse an already matching healthy installation. A version, ownership, workspace or configuration mismatch is a stop condition; do not upgrade or repurpose it automatically.
 
 3. **Prepare only new private directories when needed.** Choose absolute runtime, Home and download paths in the authorized location. Verify each is new/empty and private to the current user; do not overwrite an existing runtime or unrelated directory. In an isolated installation environment with private npm config/cache and no provider secrets:
 
@@ -17,11 +17,11 @@ Use this guide only when the user explicitly authorizes plugin initialization. C
 4. **Download and verify the fixed host.** Use a new private download directory. Download only the built release archive and its manifest:
 
    ```sh
-   curl -fL --max-time 60 https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.5.0/dsh-team-roles-0.5.0.tgz -o /absolute/new-download/dsh-team-roles-0.5.0.tgz
-   curl -fL --max-time 60 https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.5.0/SHA256SUMS -o /absolute/new-download/SHA256SUMS
+   curl -fL --max-time 60 https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.0/dsh-team-roles-0.6.0.tgz -o /absolute/new-download/dsh-team-roles-0.6.0.tgz
+   curl -fL --max-time 60 https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.0/SHA256SUMS -o /absolute/new-download/SHA256SUMS
    cd /absolute/new-download
    shasum -a 256 -c SHA256SUMS
-   printf '%s  %s\n' 'e9f89b9e93e0c236005d3ad60c78ade3a548ba38f4b9b881bb9fb6378b5f5d61' 'dsh-team-roles-0.5.0.tgz' | shasum -a 256 -c -
+   printf '%s  %s\n' '5538a263d3d2e4f05e843153e524e1501f1564324951a9f21ed6470de5ade67e' 'dsh-team-roles-0.6.0.tgz' | shasum -a 256 -c -
    ```
 
    Both checks must pass. Network/checksum failures stop initialization; never fall back to a different asset, latest or unverified bytes.
@@ -31,7 +31,7 @@ Use this guide only when the user explicitly authorizes plugin initialization. C
    ```sh
    export DSH_AGENT_TEAM_RUNTIME=/absolute/new-private-runtime/node_modules/@deepseek-ai/dsh
    export DSH_AGENT_TEAM_HOME=/absolute/new-private-dsh-home
-   node /absolute/installed-plugin/scripts/setup.mjs /absolute/new-download/dsh-team-roles-0.5.0.tgz /absolute/authorized/workspace
+   node /absolute/installed-plugin/scripts/setup.mjs /absolute/new-download/dsh-team-roles-0.6.0.tgz /absolute/authorized/workspace
    node /absolute/installed-plugin/scripts/client.mjs health
    ```
 

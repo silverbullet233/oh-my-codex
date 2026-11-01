@@ -1,6 +1,6 @@
 {
   "name": "oh-my-codex",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Repository catalog and development workspace for Codex plugins and standalone skills",

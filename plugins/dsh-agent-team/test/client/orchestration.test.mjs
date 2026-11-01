@@ -107,5 +107,5 @@ test('initialization permission is explicit, limited to setup/health and require
   assert(guide.includes('actual `dsh_team_health`'));
   assert(guide.includes('CLI-only health is insufficient'));
   assert(guide.includes('There is no auto-discovery'));
-  assert(guide.includes('e9f89b9e93e0c236005d3ad60c78ade3a548ba38f4b9b881bb9fb6378b5f5d61'));
+  assert(guide.includes('5538a263d3d2e4f05e843153e524e1501f1564324951a9f21ed6470de5ade67e'));
 });

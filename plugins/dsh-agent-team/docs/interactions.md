@@ -1,6 +1,6 @@
-# Lead interactions (unreleased)
+# Lead interactions
 
-This source change adds native answer-mode interactions and bounded MCP waits. It is not in the published catalog v0.2.1 / plugin 0.3.2 tag. Node >=24.9.0, runtime/Team profile 0.2.2-alpha.2 and host 0.5.0 remain pinned. No global configuration or provider credentials are changed.
+Catalog v0.3.0 / plugin 0.4.0 adds native answer-mode interactions and bounded MCP waits. They are absent from the earlier v0.2.1 / plugin 0.3.2 tag. Node >=24.9.0, runtime/Team profile 0.2.2-alpha.2 and host 0.6.0 remain pinned. No global configuration or provider credentials are changed.
 
 The path remains `User <-> Codex main <-> DSH Lead <-> members`. Main handles requirements, design, progress and read-only review; Lead owns implementation/testing/debugging and member instructions.
 

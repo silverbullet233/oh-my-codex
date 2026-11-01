@@ -11,7 +11,7 @@ This contract applies only to an explicitly activated DSH workflow. Discussing o
 
 ## Initialization before Lead exists
 
-Explicit user authorization to initialize this plugin permits Codex main to follow [the Agent bootstrap guide](../../docs/bootstrap.md), prepare its dedicated runtime/Home, and run setup/health before a Lead exists. This narrow initialization permission does not authorize user-project implementation/testing/debugging, work-Team creation, inference, provider credential handling or direct teammate instructions. Use explicit MCP environment values, restart the server and verify actual `dsh_team_health`; CLI health alone is insufficient. Reuse a matching healthy installation, and stop on mismatches or partial state. The guide/setup safety update is unreleased; do not claim it is present in the published v0.2.1 tag.
+Explicit user authorization to initialize this plugin permits Codex main to follow [the Agent bootstrap guide](../../docs/bootstrap.md), prepare its dedicated runtime/Home, and run setup/health before a Lead exists. This narrow initialization permission does not authorize user-project implementation/testing/debugging, work-Team creation, inference, provider credential handling or direct teammate instructions. Use explicit MCP environment values, restart the server and verify actual `dsh_team_health`; CLI health alone is insufficient. Reuse a matching healthy installation, and stop on mismatches or partial state. The guide/setup safety update starts with catalog v0.3.0; it is absent from v0.2.1.
 
 ## Communication and ownership
 
@@ -35,13 +35,13 @@ Inspect the native role catalog. With an empty catalog, omit leadRole for native
 
 After every successful Team create, present `teamId` and the returned `web.url` to the user, including on an idempotent retry. With `web.scope=host`, label the link as the owned-host Web homepage, not a Team-specific page: pinned native Web has no supported Session permalink. Never invent a deep link or expose launch tokens, cookies or credentials. Displaying the URL does not authorize opening a browser; use the existing Web handoff only when requested or otherwise authorized.
 
-## Create-time permissions (unreleased)
+## Create-time permissions
 
-Omit `permissionPreset` to preserve native defaults. Only an explicit user selection permits passing an exact `health.permissionPresets.options[].value`, after checking the host advertises `create-permission-preset`. Inspect the catalog's actual sandboxMode/approvalPolicy; never infer them from the name or self-upgrade to avoid an approval. Published host 0.5.0 lacks this capability: stop on an explicit unsupported request, without dropping the field or changing pins.
+Omit `permissionPreset` to preserve native defaults. Only an explicit user selection permits passing an exact `health.permissionPresets.options[].value`, after checking the host advertises `create-permission-preset`. Inspect the catalog's actual sandboxMode/approvalPolicy; never infer them from the name or self-upgrade to avoid an approval. The pinned host 0.6.0 supplies this capability; older 0.5.0 lacks it: stop on an explicit unsupported request, without dropping the field or changing pins.
 
 The host applies and verifies the selected preset on a fresh root before the first task/member, and returns effective `permissions` (preset, sandbox policy, approvalPolicy and sequence cut). Keep the same preset in identical create retries. Existing/restored Teams are checked read-only; mismatches or partially initialized Sessions stop without reapplying permissions. Inspect reserved IDs after failures rather than changing keys to bypass them. No global defaults or existing Teams are changed.
 
-Native `danger-full-access` normally bundles full sandbox access with approval `never`; configured bundles can differ. `never` denies actions that still require approval, not approve-all. New members snapshot the parent's sandbox and pin approval to `never`; later Lead changes do not update existing members. Workspace admission is not complete process confinement, and this preset grants no OS privilege escalation. Keep the separate explicit approval boundary intact. See [permission details](../../docs/orchestration.md#create-time-permissions-unreleased).
+Native `danger-full-access` normally bundles full sandbox access with approval `never`; configured bundles can differ. `never` denies actions that still require approval, not approve-all. New members snapshot the parent's sandbox and pin approval to `never`; later Lead changes do not update existing members. Workspace admission is not complete process confinement, and this preset grants no OS privilege escalation. Keep the separate explicit approval boundary intact. See [permission details](../../docs/orchestration.md#create-time-permissions).
 
 ## Progress, review and acceptance
 
@@ -51,11 +51,11 @@ Acceptance is separate from admitted input, processing, Lead completion and proc
 
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
-## Lead questions and approvals (unreleased)
+## Lead questions and approvals
 
 Use `dsh_team_wait` after delegation for meaningful changes, pending input or whole-Team completion; reuse its opaque baseline as `after`. Main is the default Lead question handler through `dsh_team_answer` with source=main, within the existing requirements and authority. For missing information, new decisions or expanded authority, mark `dsh_team_escalate`, ask the user in normal conversation and answer with source=user. Do not treat coordination answers as project implementation or direct teammate instructions.
 
-Use `dsh_team_pending` to refresh current delivery tokens after reconnect/cancellation; never automatically replay old affirmative answers. Questions and approvals are separate. `dsh_team_approval` permits one-shot approval only with explicit user authorization for that exact action; never blanket/always approve or invent authorization. A rostered member's native owner approval is an authority event, not a task instruction. Ordinary member conversation remains unavailable. Pending questions take priority over originating-turn completion, and submission/admission is distinct from processing. See [interaction details](../../docs/interactions.md) for bounds, receipts and native stream behavior. This bridge is not in the published v0.2.1 tag.
+Use `dsh_team_pending` to refresh current delivery tokens after reconnect/cancellation; never automatically replay old affirmative answers. Questions and approvals are separate. `dsh_team_approval` permits one-shot approval only with explicit user authorization for that exact action; never blanket/always approve or invent authorization. A rostered member's native owner approval is an authority event, not a task instruction. Ordinary member conversation remains unavailable. Pending questions take priority over originating-turn completion, and submission/admission is distinct from processing. See [interaction details](../../docs/interactions.md) for bounds, receipts and native stream behavior. This bridge starts with catalog v0.3.0 / plugin 0.4.0, not v0.2.1.
 
 ## Native Web and lifetime
 
