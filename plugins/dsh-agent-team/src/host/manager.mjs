@@ -117,14 +117,14 @@ export class OwnedHost {
     }
     return error;
   }
-  async request(method, params = {}) {
+  async request(method, params = {}, options = {}) {
     try {
       if (method === 'shutdown') return await this.shutdown();
       await this.ensure();
       if (method === 'web') {
         return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
       }
-      const value = await this.gateway.request(method, params);
+      const value = await this.gateway.request(method, params, options);
       return method === 'health' ? { ...value, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
   }

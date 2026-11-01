@@ -1,6 +1,6 @@
 # Activated orchestration contract
 
-**Release inclusion:** this contract belongs to plugin **0.3.2** in catalog **v0.2.1**. It is included only when that reviewed release is actually published, verified and installed; a source branch alone is not a published installer. Published catalog v0.1.0 / plugin 0.2.0 lacks this contract. Published catalog v0.2.0 / plugin 0.3.1 introduced this same orchestration behavior; v0.2.1 / plugin 0.3.2 corrects installation access documentation without changing execution ownership. The unpublished 0.3.0 candidate was superseded by the skill-content update.
+**Release inclusion:** catalog **v0.2.1** / plugin **0.3.2** was published on 2026-10-31. Its activated main/Lead ownership contract is unchanged here. The Agent initialization guide and [interaction bridge](interactions.md) in this source branch are unreleased and are not present in that immutable tag.
 
 Activation is explicit: ask Codex to use DSH Agent Team for the work. Merely discussing/updating the plugin does not activate it, and other Codex workflows remain unchanged.
 
@@ -21,10 +21,10 @@ Main follows progress and reviews the changes/evidence independently. Findings g
 
 ## What the boundary enforces
 
-The MCP surface exposes only health, Web handoff, create, send, status, result, stop and shutdown. Create prepares the managed root Session as Lead and returns its durable teamId/sessionId. Send addresses that managed Lead/root; member targeting fields and alternate member-message tools are not exposed. The host's managed-Team admission rejects a child Session ID as UNKNOWN_TEAM. Status/result may include member observations.
+The MCP surface exposes health, Web handoff, create, send, status, result, stop and shutdown, plus the unreleased typed pending/answer/escalate/approval/wait tools. Create prepares the managed root Session as Lead and returns its durable teamId/sessionId. Send addresses that managed Lead/root; member targeting fields and alternate member-message tools are not exposed. The host's managed-Team admission rejects a child Session ID as UNKNOWN_TEAM. Status/result may include member observations.
 
 The actual official-CLI acceptance gate checks that the returned root is the native Lead and that a send using a real native child ID is rejected. MCP regressions check allowed fields/tools and that create/send preserve the root identity. These checks establish this plugin API boundary, not a restriction on every possible upstream/native channel.
 
-This skill is behavioral guidance. It does not remove Codex's other tools, create a global sandbox or install a Codex session tool whitelist. Native role creation guards control DSH role execution, not Codex main. The ordinary authenticated native Web/Gateway may offer broader capabilities to users; their access is unchanged. Codex must not use Web, direct Session calls, scripts or another tool to bypass the Lead-only workflow. Web is used by Codex for observation and user approval handoff; users retain their native controls.
+This skill is behavioral guidance. It does not remove Codex's other tools, create a global sandbox or install a Codex session tool whitelist. Native role creation guards control DSH role execution, not Codex main. The ordinary authenticated native Web/Gateway may offer broader capabilities to users; their access is unchanged. Codex must not use Web, direct Session calls, scripts or another tool to bypass the Lead-only workflow. While Codex controls the Team, Web observation/settings are supported; Web messages or answering forwarded prompts/approvals are unsupported concurrent interaction. No client arbitration is added; users retain native controls. A rostered member authority event may be decided through the separate explicit approval tool; it does not expose member task instructions.
 
 Host dsh-team-roles 0.5.0 already supplies the managed root API boundary, but does not install or globally enforce this Codex behavior. The installed 0.3.2 skill supplies the opt-in contract. Future releases must preserve the distinction between behavioral guidance, exposed API validation and any separately verified tool enforcement.

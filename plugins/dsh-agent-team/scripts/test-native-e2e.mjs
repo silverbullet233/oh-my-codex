@@ -62,6 +62,18 @@ try {
   const after = await owner.request('status', { teamId: firstId });
   assert.deepEqual(after.members.filter(member => member.name !== 'lead').map(member => member.memberId).sort(), childIds);
   assert.equal((await owner.request('health')).host.pid, pid);
+  const interactionTeam = await owner.request('create', { key: 'interaction-e2e', cwd: workspace, text: 'INTERACTION_BRIDGE: synthetic question and authority only.' });
+  const wait = () => owner.request('wait', { teamId: interactionTeam.teamId, timeoutMs: 1000 });
+  const question = await until(async () => { const result = await wait(); return result.interactions.find(row => row.kind === 'question'); });
+  const identity = row => ({ teamId: row.teamId, interactionId: row.interactionId, deliveryId: row.deliveryId });
+  await owner.request('answer', { ...identity(question), source: 'main', answers: [{ id: 'scope', selected: ['existing'] }] });
+  const approval = await until(async () => { const result = await wait(); return result.interactions.find(row => row.kind === 'approval'); });
+  await owner.request('approval', { ...identity(approval), decision: 'deny' });
+  await until(async () => (await wait()).reason === 'completed');
+  const interactionEvidence = JSON.parse((await readFile(join(home, 'synthetic-interactions.jsonl'), 'utf8')).trim());
+  assert.equal(interactionEvidence.agentId, interactionTeam.teamId);
+  assert.deepEqual(interactionEvidence.answer, { answers: [{ id: 'scope', selected: ['existing'] }] });
+  assert.equal(interactionEvidence.approval, 'rejected');
   if (flags.includes('--open')) await owner.request('web');
   assert.equal((await owner.shutdown()).stopped, true);
   assert.equal(birth(pid), null);
@@ -72,7 +84,7 @@ try {
   await assert.rejects(access(join(home, '.credentials.yaml')), { code: 'ENOENT' });
   const rows = (await readFile(join(home, 'synthetic-requests.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
   assert(rows.length <= 24);
-  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, leadRootVerified: true, memberSendRejected: true, sameMember: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
+  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, leadRootVerified: true, memberSendRejected: true, sameMember: true, interactionBridge: true, nativeWait: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
 } finally {
   await owner.close();
   if (!flags.includes('--keep')) {

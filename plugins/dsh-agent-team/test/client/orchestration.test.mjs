@@ -26,7 +26,10 @@ test('contract permits observations and honestly distinguishes guidance from glo
   const docs = await read('docs/orchestration.md');
   const pkg = JSON.parse(await read('package.json'));
   assert(skill.includes('Status/member observations are allowed; direct member instructions are not'));
-  assert(skill.includes('Web for observation and user approval handoff, not member instructions'));
+  assert(skill.includes('Web for observation/settings only'));
+  assert(skill.includes('unsupported concurrent interaction'));
+  assert(skill.includes('never blanket/always approve'));
+  assert(skill.includes('Main is the default Lead question handler'));
   assert(skill.includes('behavioral guidance: it does not remove Codex tools'));
   assert(skill.includes('normal Codex behavior is unchanged'));
   assert(docs.includes('Their access is unchanged') || docs.includes('their access is unchanged'));
@@ -60,7 +63,7 @@ test('MCP create/send keep the Lead root and never dispatch member fields or mes
   }
   for (const name of ['dsh_member_send', 'dsh_team_send_member', 'dsh_agent_prompt']) assert.equal((await call(name, { teamId: 'synthetic-child' })).error.code, -32602);
   assert.equal(calls.length, count);
-  assert.equal(tools.length, 8);
+  assert.equal(tools.length, 13);
   assert(tools.find(tool => tool.name === 'dsh_team_send').inputSchema.properties.teamId.description.includes('Lead/root'));
 });
 
