@@ -115,6 +115,50 @@ test('continued questions deduplicate at capacity, serialize replies, reconcile 
   queue.continued('lead', []); assert.equal(queue.pending().length, 0); assert.equal(queue.bytes, 0);
 });
 
+test('equivalent reordered replies share in-flight submission and completed receipts', async t => {
+  const gate = Promise.withResolvers(); let calls = 0;
+  const queue = new InteractionQueue({ instanceId: 'retry', answerContinued: async () => { calls++; return gate.promise; } });
+  t.after(() => queue.invalidate());
+  queue.continued('lead', [{ callId: 'retry-call', questions: question.questions, state: 'continued' }]);
+  const identity = ids(queue.pending()[0]);
+  const original = { ...identity, ...answer };
+  const reordered = { source: original.source, answers: original.answers.map(a => ({ selected: a.selected, id: a.id })), deliveryId: identity.deliveryId, interactionId: identity.interactionId, teamId: identity.teamId };
+  const replies = Promise.all([queue.answer(original), queue.answer(reordered)]);
+  gate.resolve(true);
+  const receipts = await replies;
+  assert.equal(receipts[1].duplicate, true); assert.equal(calls, 1);
+  assert.equal((await queue.answer(reordered)).duplicate, true);
+});
+
+test('projection reconciliation ignores older cuts and responses from a prior connection', async t => {
+  const { client, server } = await fixture(t);
+  const snapshot = (seq, callId) => ({ kind: 'sequenced', asOfSeq: seq, values: { userQuestions: { active: callId ? [{ callId, questions: question.questions, state: 'continued' }] : [], settled: [] } } });
+  const entered = Promise.withResolvers(), release = Promise.withResolvers(); let first = true, current = snapshot(2, 'new');
+  server.ctx.sessionController.projections = async () => { if (first) { first = false; entered.resolve(); return release.promise; } return current; };
+  const older = client.refreshPending('lead'); await entered.promise;
+  try {
+    await client.refreshPending('lead'); const fresh = client.interactions.pending('lead')[0];
+    release.resolve(snapshot(1)); await older;
+    assert.equal(client.interactions.pending('lead')[0]?.deliveryId, fresh.deliveryId);
+    current = snapshot(3); await client.refreshPending('lead');
+    current = snapshot(2, 'new'); await client.refreshPending('lead');
+    assert.equal(client.interactions.pending('lead').length, 0);
+    const nativeRead = client.observation.unary.bind(client.observation);
+    for (const outcome of ['value', 'failure']) {
+      const late = Promise.withResolvers();
+      client.observation.unary = () => late.promise;
+      const previousConnection = client.refreshPending('lead');
+      await client.close(); await client.ready(); client.observation.unary = nativeRead;
+      current = snapshot(1, 'reconnected'); await client.refreshPending('lead');
+      const reconnected = client.interactions.pending('lead')[0]; assert(reconnected);
+      if (outcome === 'value') late.resolve(snapshot(50, 'stale-connection'));
+      else late.reject(Object.assign(new Error('Old connection was disposed'), { code: 'gateway/cancelled' }));
+      await previousConnection;
+      assert.equal(client.interactions.pending('lead')[0].deliveryId, reconnected.deliveryId);
+    }
+  } finally { release.resolve(snapshot(1)); }
+});
+
 test('timed native waits claim an answer window and retain it through result transmission', { timeout: 10000 }, async t => {
   const { server, client } = await fixture(t);
   const cancel = new AbortController();

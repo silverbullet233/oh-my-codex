@@ -15,7 +15,7 @@ export function verifyHealth(value, entry) {
 export class GatewayClient {
   constructor({ runtime, entry, timeoutMs = 15000 }) {
     Object.assign(this, { runtime, entry, timeoutMs, invalid: true });
-    this.observation = new NativeObservation(this); this.waiters = new Set(); this.waitLifetime = new AbortController(); this.connectionEpoch = 0;
+    this.observation = new NativeObservation(this); this.waiters = new Set(); this.waitLifetime = new AbortController(); this.connectionEpoch = 0; this.projectionSequences = new Map();
     this.interactions = new InteractionQueue({ instanceId: entry.instanceId,
       authorize: async (...args) => { await untilAbort(this.readyHealth.promise, args[3]); return this.observation.authority(...args); },
       claimTimed: (...args) => this.observation.claim(...args),
@@ -29,8 +29,16 @@ export class GatewayClient {
   async ready() { if (this.invalid || this.connecting) { this.connecting ??= this.connect().finally(() => { this.connecting = undefined; }); await this.connecting; } }
   wake() { for (const notify of this.waiters) notify(); }
   async refreshPending(teamId, signal) {
-    const projections = await this.observation.unary('projections', { sessionId: teamId }, signal);
-    if (projections?.kind === 'sequenced') this.interactions.continued(teamId, projections.values.userQuestions?.active);
+    const ctx = this.ctx;
+    let projections;
+    try { projections = await this.observation.unary('projections', { sessionId: teamId }, signal); }
+    catch (error) { aborted(signal); if (ctx !== this.ctx || this.invalid) return; throw error; }
+    aborted(signal);
+    if (ctx !== this.ctx || this.invalid || projections?.kind !== 'sequenced') return;
+    if (!Number.isSafeInteger(projections.asOfSeq)) throw new ClientError('INVALID_BASELINE', 'Native projection has no valid sequence cut.');
+    if (projections.asOfSeq < (this.projectionSequences.get(teamId) ?? -Infinity)) return;
+    this.projectionSequences.set(teamId, projections.asOfSeq);
+    this.interactions.continued(teamId, projections.values.userQuestions?.active);
   }
   async connect() {
     const epoch = this.connectionEpoch;
@@ -127,7 +135,7 @@ export class GatewayClient {
       throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain IDs; work continues independently and admission may be uncertain.');
     }
   }
-  async disconnect() { this.invalid = true; this.interactions.invalidate(); this.wake(); const ctx = this.ctx; this.ctx = undefined; await ctx?.fiber.dispose(); }
+  async disconnect() { this.invalid = true; this.projectionSequences.clear(); this.interactions.invalidate(); this.wake(); const ctx = this.ctx; this.ctx = undefined; await ctx?.fiber.dispose(); }
   async close() {
     this.connectionEpoch++; this.waitLifetime.abort();
     const connecting = this.connecting;

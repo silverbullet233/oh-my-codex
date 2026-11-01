@@ -8,6 +8,18 @@ import { ownedFixture } from '../fixtures/owned.mjs';
 import { OwnedHost, initializeOwnedHome } from '../../src/host/manager.mjs';
 import { readPrivate, writePrivate, birth, delay } from '../../src/host/files.mjs';
 
+test('cancelled lifecycle requests cannot enter shutdown, startup or browser handoff', async () => {
+  const owner = new OwnedHost({});
+  owner.ensure = owner.shutdown = async () => assert.fail('Cancelled lifecycle action must not start');
+  const reason = Object.assign(new Error('MCP cancelled'), { code: 'CANCELLED' });
+  for (const method of ['shutdown', 'web']) await assert.rejects(owner.request(method, {}, { signal: AbortSignal.abort(reason) }), { code: 'CANCELLED' });
+  const entered = Promise.withResolvers(), release = Promise.withResolvers(), controller = new AbortController();
+  owner.ensure = async () => { entered.resolve(); await release.promise; };
+  const web = owner.request('web', {}, { signal: controller.signal });
+  await entered.promise; controller.abort(reason); release.resolve();
+  await assert.rejects(web, { code: 'CANCELLED' });
+});
+
 test('concurrent independent callers start once on a free port and reuse across API disconnect', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   const second = new OwnedHost(fixture.config);

@@ -70,7 +70,7 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
   };
   const observe = status => {
     const ids = [...new Set([teamId, ...(status.team?.members ?? status.teamActivity?.members ?? []).map(m => m.id)])];
-    if (ids.length > 32) throw new ClientError('WAIT_LIMIT', 'The Team exceeds the bounded observation roster.');
+    if (new Set([...observed, ...ids]).size > 32) throw new ClientError('WAIT_LIMIT', 'The wait exceeds its bound of 32 distinct observed Sessions.');
     for (const id of ids) if (!observed.has(id)) { observed.add(id); pump(id, 'follow'); pump(id, 'observeState'); }
   };
   try {
@@ -99,8 +99,10 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
   }
   // One bounded final authoritative read also covers member-only changes at the deadline.
   if (callerSignal.aborted || clientSignal.aborted) return output('cancelled');
-  try { value = await view(AbortSignal.timeout(1000)); } catch {}
+  try { value = await view(AbortSignal.any([callerSignal, clientSignal, AbortSignal.timeout(1000)])); } catch {}
+  if (callerSignal.aborted || clientSignal.aborted) return output('cancelled');
   if (gateway.interactions.pending(teamId).length) return output('interaction');
   if (value?.result.completed === true) return output('completed');
+  if (value && baseline !== undefined && (signature(value) !== baseline || repaired)) return output('changed');
   return output('timeout');
 }

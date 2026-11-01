@@ -7,6 +7,7 @@ import { privateDirectory, readPrivate, writePrivate, birth, delay, withLifecycl
 import { loadRuntime } from '../native/runtime.mjs';
 import { GatewayClient } from '../native/gateway.mjs';
 import { ClientError } from '../native/errors.mjs';
+import { aborted } from '../native/interactions.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
 export function configuration(env = process.env) {
@@ -119,8 +120,10 @@ export class OwnedHost {
   }
   async request(method, params = {}, options = {}) {
     try {
-      if (method === 'shutdown') return await this.shutdown();
+      aborted(options.signal);
+      if (method === 'shutdown') return await this.shutdown(options);
       await this.ensure();
+      aborted(options.signal);
       if (method === 'web') {
         return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
       }
@@ -128,9 +131,11 @@ export class OwnedHost {
       return method === 'health' ? { ...value, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
   }
-  async shutdown() {
+  async shutdown({ signal } = {}) {
+    aborted(signal);
     let supervisor;
     const result = await this.locked(async () => {
+      aborted(signal);
       let entry = await this.current();
       if (!entry) {
         if (await this.pendingStart()) return { stopped: false, reason: 'startup-in-progress' };
@@ -140,8 +145,9 @@ export class OwnedHost {
       supervisor = { pid: entry.supervisorPid, birth: birth(entry.supervisorPid) };
       const client = new GatewayClient({ runtime: this.runtime, entry });
       try {
-        await client.request('health');
-        const guard = await client.request('prepareShutdown');
+        await client.request('health', {}, { signal });
+        const guard = await client.request('prepareShutdown', {}, { signal });
+        aborted(signal);
         if (!guard.safeToStop) return { stopped: false, reason: 'active-or-uncertain-work', activity: guard };
         if (Date.now() >= guard.leaseExpiresAt || birth(entry.pid) !== entry.birth) throw new ClientError('OWNERSHIP_CHANGED', 'Owned process identity or shutdown lease changed; no signal was sent.');
         process.kill(entry.pid, 'SIGTERM');
