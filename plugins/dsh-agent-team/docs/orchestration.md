@@ -10,6 +10,8 @@ The communication path is `User <-> Codex main <-> DSH Lead <-> team members`.
 
 Codex main and DSH Lead must communicate in English, including task briefs, follow-up questions/instructions, review feedback, free-text answers and Lead replies. Main includes `Communicate with Codex main in English.` in initial briefs and follow-up instructions. Keep code, paths, symbols, exact IDs/option values and necessary original-language quotations unchanged. This unreleased language contract is behavioral guidance; the runtime does not detect or translate language.
 
+After each successful create, main presents `teamId` and `web.url`. `web.scope=host` identifies the owned-host homepage; it is not a Team-specific link. Native 0.2.2-alpha.2 persists Session selection in [workspace navigation state](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-alpha.2/packages/client/ui-workspace/src/client/navigation.ts), without a supported Session permalink. Find the returned root ID in Web. The URL contains no launch capability or cookies, and displaying it does not auto-open a browser. Authentication, when needed, uses the existing authorized `dsh_team_web` handoff. This create response/convention is unreleased.
+
 | Owner | Responsibility |
 | --- | --- |
 | User and Codex main | Requirements, system design and material scope decisions |
