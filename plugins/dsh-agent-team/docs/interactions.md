@@ -1,6 +1,6 @@
-# Lead interactions (unreleased)
+# Lead interactions
 
-This source change adds native answer-mode interactions and bounded MCP waits. It is not in the published catalog v0.2.1 / plugin 0.3.2 tag. Node >=24.9.0, runtime/Team profile 0.2.2-alpha.2 and host 0.5.0 remain pinned. No global configuration or provider credentials are changed.
+Catalog v0.3.0 / plugin 0.4.0 adds native answer-mode interactions and bounded MCP waits. They are absent from the earlier v0.2.1 / plugin 0.3.2 tag. Node >=24.9.0, runtime/Team profile 0.2.2-alpha.2 and host 0.6.0 remain pinned. No global configuration or provider credentials are changed.
 
 The path remains `User <-> Codex main <-> DSH Lead <-> members`. Main handles requirements, design, progress and read-only review; Lead owns implementation/testing/debugging and member instructions.
 
@@ -8,7 +8,7 @@ The path remains `User <-> Codex main <-> DSH Lead <-> members`. Main handles re
 
 1. After create/send, call `dsh_team_wait` with the Lead/root `teamId` and `timeoutMs` (0–30000; default 10000). Pass its opaque `baseline` as `after` next time. This is a comparison token, not a native sequence cursor.
 2. Inspect `reason`, `interactions`, native `status` and `result`. Reasons are `changed`, `interaction`, `completed`, `timeout` or `cancelled`. Pending input takes priority over completion of its originating turn. Lead idle alone never proves whole-Team completion; require native `result.completed === true`, expected artifacts and acceptance review.
-3. Main answers ordinary Lead questions using `dsh_team_answer`, exact question IDs, offered labels and/or custom text, and `source: "main"`, within existing requirements and authority. For missing information, new decisions or expanded authority, call `dsh_team_escalate` with a reason, ask the user in normal conversation, then answer with `source: "user"`. Escalate sends no message itself. Plan reviews changing agreed scope require user input.
+3. Main answers ordinary Lead questions using `dsh_team_answer`, exact question IDs, offered labels and/or custom text, and `source: "main"`, within existing requirements and authority. Write free-text answers to Lead in English, including with `source: "user"`; preserve exact IDs, offered labels, code, paths and necessary original-language quotations. Initial briefs and follow-up instructions request English replies from Lead. For missing information, new decisions or expanded authority, call `dsh_team_escalate` with a reason, ask the user in normal conversation, then answer with `source: "user"`. Escalate sends no message itself. Plan reviews changing agreed scope require user input.
 4. Refresh input with `dsh_team_pending`. Pass its `teamId`, `interactionId` and current `deliveryId` unchanged. Interaction tools require the same live MCP client; one-shot CLI invocations cannot carry delivery tokens between processes.
 
 ```json

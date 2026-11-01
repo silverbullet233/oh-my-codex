@@ -2,15 +2,15 @@
 
 Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a **dedicated ordinary DSH Web host**, then connects through the official Node Connection/Typert Gateway. The native host owns role policy, immutable member snapshots, execution, persistence, tools and approvals. The client contains manifests, a skill, native API calls and process lifecycle management.
 
-Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.5.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
+Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-Catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31** and passed GitHub Actions release validation. The catalog and plugin versions are independent. Register the marketplace with that exact tag; do not use a floating ref.
+These instructions target catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
-For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and explicit MCP environment configuration. The guide and setup safety changes are unreleased; the published v0.2.1 tag keeps its manual installation flow.
+For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and explicit MCP environment configuration. The guide and setup safety changes are included from catalog v0.3.0; v0.2.1 keeps its manual installation flow.
 
 | CLI method | MCP tool | Purpose |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It 
 | MCP only | `dsh_team_approval` | Separate explicit one-shot approval or denial |
 | MCP only | `dsh_team_wait` | Bounded native stream observation without token-by-token wakeups |
 
-The five interaction/wait tools are unreleased. See [Lead interactions](docs/interactions.md) for the main/Lead question loop, approval boundary and unsupported simultaneous Web interaction.
+The five interaction/wait tools are included from plugin 0.4.0. See [Lead interactions](docs/interactions.md) for the main/Lead question loop, approval boundary and unsupported simultaneous Web interaction.
 
 From the installed plugin directory, `node scripts/client.mjs health` uses the same lifecycle as MCP. `mcp.json` resolves `${PLUGIN_ROOT}` inside the self-contained plugin, independent of the working directory. The installed plugin has no npm runtime dependency; it loads the exact official Node transport from the configured DSH installation.
 

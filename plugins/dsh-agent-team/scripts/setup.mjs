@@ -21,7 +21,7 @@ async function verifyInstalled(home) {
     const manifestPath = await realpath(join(web, 'package.json'));
     if (!manifestPath.startsWith(`${home}/`)) throw new Error();
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    for (const [name, expected] of [[team, version], ['dsh-team-roles', '0.5.0']]) {
+    for (const [name, expected] of [[team, version], ['dsh-team-roles', '0.6.0']]) {
       const path = await realpath(join(web, 'node_modules', name, 'package.json'));
       if (!path.startsWith(`${home}/`)) throw new Error();
       const pkg = JSON.parse(await readFile(path, 'utf8'));
@@ -57,7 +57,7 @@ export async function setup({ tarball, workspace, config = configuration(), env 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const [tarball, workspace = process.cwd()] = process.argv.slice(2);
-    if (!tarball) throw new ClientError('USAGE', 'Usage: node scripts/setup.mjs /absolute/verified-dsh-team-roles-0.5.0.tgz /absolute/workspace');
+    if (!tarball) throw new ClientError('USAGE', 'Usage: node scripts/setup.mjs /absolute/verified-dsh-team-roles-0.6.0.tgz /absolute/workspace');
     const result = await setup({ tarball, workspace });
     console.log(result.reused ? 'Matching dedicated profile retained; verify connectivity with MCP health.' : 'Dedicated profile installed; verify connectivity with MCP health.');
   } catch (error) {

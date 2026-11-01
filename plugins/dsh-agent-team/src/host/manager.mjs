@@ -128,6 +128,7 @@ export class OwnedHost {
         return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
       }
       const value = await this.gateway.request(method, params, options);
+      if (method === 'create') return { ...value, web: { url: new URL(this.entry.url).origin, scope: 'host' } };
       return method === 'health' ? { ...value, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
   }

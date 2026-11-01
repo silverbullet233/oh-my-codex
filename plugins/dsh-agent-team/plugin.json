@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "dsh-agent-team",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Opt-in native DSH Teams with a dedicated Codex-owned Web host.",
   "author": {
     "name": "oh-my-codex contributors"

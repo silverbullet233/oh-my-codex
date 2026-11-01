@@ -2,11 +2,16 @@
 
 Versions here describe the repository catalog. Each plugin has its own version.
 
-## Unreleased
+## 0.3.0
 
 - Add an Agent-facing bootstrap guide using the existing setup and explicit MCP environment configuration.
 - Guard setup workspace/ownership, reuse matching complete installations and refuse partial, incompatible or uncertain state without overwriting it.
 - Correct v0.2.1 availability documentation; the new guide and setup changes are not part of that published tag.
+
+- DSH Agent Team 0.4.0 adds the typed Lead question/approval bridge and bounded native-stream waits.
+- Require English only between Codex main and Lead, preserving exact code, paths, IDs, option values and quotations.
+- Return a safe owned-host Web homepage and Team ID after create/retry.
+- Pin host 0.6.0 and expose explicitly selected create-time permission presets with verified pre-task policy and fail-closed retries; runtime remains 0.2.2-alpha.2.
 
 ## 0.2.1
 

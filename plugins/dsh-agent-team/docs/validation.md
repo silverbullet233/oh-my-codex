@@ -15,7 +15,7 @@ The catalog/release tests and client suites cover native API capability checks, 
 The separate cross-repository gate uses the **actual official DSH CLI**, ordinary Web/base and Team profile, the newly built host tarball, a read-only in-memory credential provider and a bounded synthetic LLM adapter:
 
 ```sh
-node plugins/dsh-agent-team/scripts/test-native-e2e.mjs /absolute/official-dsh-package /absolute/dsh-team-roles-0.5.0.tgz
+node plugins/dsh-agent-team/scripts/test-native-e2e.mjs /absolute/official-dsh-package /absolute/dsh-team-roles-0.6.0.tgz
 ```
 
 Run it in an isolated environment with PATH and locale only. It creates its own home/profile, installs the actual candidate and test-only native contribution, and checks real managed-Team creation, duplicate create, two native role members, same-member follow-up, result/completion, client disconnect, safe shutdown and cold persistent restart. It asserts that no persistent credential file was created. `--open --keep` is an explicit visual-validation option; the retained process/home must be cleaned up afterward. This gate is independent of ordinary CI's transport fixtures.

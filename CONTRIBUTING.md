@@ -52,7 +52,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
-npm run release:prepare -- --tag v0.2.1 --output ./dist/release-v0.2.1
+npm run release:prepare -- --tag v0.3.0 --output ./dist/release-v0.3.0
 ```
 
 The example pins the intended catalog version; verify its version mapping and release authorization before tagging. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
@@ -61,7 +61,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.3.2.tgz`.
+- Plugin tarballs, currently `dsh-agent-team-0.4.0.tgz`.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.

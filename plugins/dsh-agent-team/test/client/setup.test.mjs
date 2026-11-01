@@ -19,7 +19,7 @@ async function fixture(t) {
     const name = args[5].startsWith(team) ? team : 'dsh-team-roles';
     assert.equal(args[5], name === team ? `${team}@0.2.2-alpha.2` : await realpath(tarball));
     await put(join(home, 'profiles/web/package.json'), { dsh: { profile: { bundles: [team, 'dsh-team-roles'] } } });
-    await installed(home, name, name === team ? '0.2.2-alpha.2' : '0.5.0');
+    await installed(home, name, name === team ? '0.2.2-alpha.2' : '0.6.0');
   } };
   return { ...f, home, workspace, options, calls };
 }

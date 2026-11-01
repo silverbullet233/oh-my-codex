@@ -10,22 +10,22 @@ Independent Codex plugins and reusable skills. Each plugin is self-contained und
 
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
-**Published release:** catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31** and passed its GitHub Actions release validation. The fixed-tag commands below are available to authorized repository users. The older v0.1.0 catalog contains the legacy plugin.
+**Installation target:** catalog **v0.3.0** / plugin **0.4.0**. Use these fixed pins only after that exact release is published and verified. The earlier catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31**; immutable older tags do not gain these additions.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
 ```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.1
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.0
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
 Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
 
-The [Agent bootstrap guide](plugins/dsh-agent-team/docs/bootstrap.md) is an unreleased addition using the existing setup and explicit MCP configuration. It is not included in v0.2.1; that published tag still uses the manual setup below. No release tag or marketplace pin is changed by this work.
+Use the [Agent bootstrap guide](plugins/dsh-agent-team/docs/bootstrap.md) for guided initialization with existing setup and explicit MCP configuration. It is introduced in catalog v0.3.0, alongside Lead interactions, bounded waits, English main/Lead communication, explicit permission presets and safe Web homepage links.
 
-The version mapping for this release is **catalog v0.2.1 → dsh-agent-team 0.3.2**, paired with **[dsh-team-roles 0.5.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.5.0)** and exact DSH **0.2.2-alpha.2**. Normal installation uses the fixed catalog tag, never `main`, a feature branch or a floating latest ref. Check [Releases](https://github.com/silverbullet233/oh-my-codex/releases) before selecting another version.
+The version mapping for this release is **catalog v0.3.0 → dsh-agent-team 0.4.0**, paired with **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)** and exact DSH **0.2.2-alpha.2**. Normal installation uses the fixed catalog tag, never `main`, a feature branch or a floating latest ref. Check [Releases](https://github.com/silverbullet233/oh-my-codex/releases) before selecting another version.
 
-The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.3.2`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
+The tag versions the entire catalog; plugins keep independent versions (`dsh-agent-team` is currently `0.4.0`). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
 
 ## Update or roll back
 
@@ -40,7 +40,7 @@ An immutable tag stays on that tag. To select a different published tag, first r
 
 ```sh
 codex plugin marketplace remove oh-my-codex
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.2.1
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.0
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 

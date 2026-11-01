@@ -38,6 +38,36 @@ test('contract permits observations and honestly distinguishes guidance from glo
   assert(docs.includes('not Codex main'));
 });
 
+test('main/Lead English guidance preserves structured values and original quoted material', async () => {
+  const skill = await read('skills/dsh-agent-team/SKILL.md'), docs = await read('docs/orchestration.md');
+  assert(skill.includes('All communication between Codex main and DSH Lead must be in English'));
+  for (const source of [skill, docs]) {
+    assert(source.includes('Communicate with Codex main in English.'));
+    assert(source.includes('original-language quotations'));
+    assert(source.includes('behavioral'));
+  }
+  for (const name of ['dsh_team_create', 'dsh_team_send', 'dsh_team_answer']) assert(tools.find(tool => tool.name === name).description.includes('English'));
+  const calls = [], dispatch = createDispatcher({ request: async (method, params) => { calls.push({ method, params }); return { accepted: true }; } });
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const brief = 'Communicate with Codex main in English. Fix `模块_α` in `/tmp/项目/src.ts`; original error: "权限不足".';
+  const inputs = [
+    ['dsh_team_create', { key: '任务-1', cwd: '/tmp/项目', text: brief }],
+    ['dsh_team_send', { teamId: '会话-1', inputId: '跟进-1', text: brief }],
+    ['dsh_team_answer', { teamId: '会话-1', interactionId: '交互-1', deliveryId: '投递-1', source: 'user', answers: [{ id: '问题-1', selected: ['现有选项'] }, { id: '问题-2', selected: [], custom: 'Use `/tmp/项目`; preserve the quoted message "权限不足".' }] }],
+  ];
+  for (const [index, [name, args]] of inputs.entries()) {
+    const response = await dispatch({ jsonrpc: '2.0', id: index + 2, method: 'tools/call', params: { name, arguments: args } });
+    assert.equal(response.result?.isError, undefined); assert.deepEqual(calls[index].params, args);
+  }
+});
+
+test('create-time permissions require explicit choice and keep native approval semantics', async () => {
+  const skill = await read('skills/dsh-agent-team/SKILL.md');
+  for (const clause of ['Only an explicit user selection', 'never infer them from the name or self-upgrade', 'Existing/restored Teams are checked read-only', '`never` denies actions', 'Workspace admission is not complete process confinement']) assert(skill.includes(clause));
+  const description = tools.find(tool => tool.name === 'dsh_team_create').inputSchema.properties.permissionPreset.description;
+  assert(description.includes('explicitly selected by the user')); assert(description.includes('Omit to preserve native defaults'));
+});
+
 test('MCP create/send keep the Lead root and never dispatch member fields or message tools', async () => {
   const root = 'synthetic-lead-root', calls = [];
   const dispatch = createDispatcher({ async request(method, params) {
@@ -77,5 +107,5 @@ test('initialization permission is explicit, limited to setup/health and require
   assert(guide.includes('actual `dsh_team_health`'));
   assert(guide.includes('CLI-only health is insufficient'));
   assert(guide.includes('There is no auto-discovery'));
-  assert(guide.includes('e9f89b9e93e0c236005d3ad60c78ade3a548ba38f4b9b881bb9fb6378b5f5d61'));
+  assert(guide.includes('5538a263d3d2e4f05e843153e524e1501f1564324951a9f21ed6470de5ade67e'));
 });

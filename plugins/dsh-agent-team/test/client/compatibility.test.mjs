@@ -8,13 +8,14 @@ import { GatewayClient } from '../../src/native/gateway.mjs';
 import { loadRuntime } from '../../src/native/runtime.mjs';
 import { serveNativeFixture, contract } from '../fixtures/native-server.mjs';
 import { ownedFixture } from '../fixtures/owned.mjs';
-async function fixture(t, { catalog, createError, healthResult, health = contract } = {}) {
+async function fixture(t, { catalog, createError, createResult, healthResult, health = contract } = {}) {
   const owned = await ownedFixture(t);
   const calls = [];
   const server = await serveNativeFixture({ health, dispatch: async (method, params) => {
     calls.push({ method, params });
     if (method === 'health') return { ...healthResult, ...(catalog === undefined ? {} : { roles: catalog }) };
     if (method === 'create' && createError) throw createError;
+    if (method === 'create' && createResult) return createResult;
     return { accepted: true };
   } });
   const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
@@ -26,6 +27,32 @@ test('independent client handshakes capabilities before a write and retains exac
   const params={key:'synthetic',cwd:'/synthetic',text:'Synthetic standalone client input.'};
   assert.equal((await client.request('create',params)).accepted,true);
   assert.deepEqual(calls,[{method:'health',params:{}},{method:'create',params}]);
+});
+test('explicit permission intent requires host support without fallback; default remains compatible', async t => {
+  const { client, calls } = await fixture(t);
+  const params = { key: 'explicit-permission', cwd: '/synthetic', text: 'Synthetic task.', permissionPreset: 'danger-full-access' };
+  await assert.rejects(client.request('create', params), { code: 'CAPABILITY_MISMATCH' });
+  assert.deepEqual(calls.map(call => call.method), ['health']);
+});
+test('MCP forwards exact explicit preset and reports actual configured permissions', async t => {
+  const permissions = { preset: 'danger-full-access', sandbox: { mode: 'workspace-write', workspaceRoot: '/synthetic' }, approvalPolicy: 'ask', asOfSeq: 5 };
+  const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'create-permission-preset'] }, createResult: { teamId: 'synthetic', accepted: true, permissions } });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const params = { key: 'explicit-permission', cwd: '/synthetic', text: 'Synthetic task.', permissionPreset: 'danger-full-access' };
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_create', arguments: params } });
+  assert.deepEqual(response.result.structuredContent.permissions, permissions);
+  assert.deepEqual(calls.filter(call => call.method === 'create'), [{ method: 'create', params }]);
+});
+test('missing or mismatched permission receipts stay uncertain without replays', async t => {
+  const receipt = { preset: 'danger-full-access', sandbox: { mode: 'workspace-write', workspaceRoot: '/synthetic' }, approvalPolicy: 'ask', asOfSeq: 1 };
+  const malformedScopes = [undefined, '', 'relative', 42, '/bad\0root'].map(workspaceRoot => ({ ...receipt, sandbox: { mode: 'workspace-write', workspaceRoot } }));
+  malformedScopes.push({ ...receipt, sandbox: { ...receipt.sandbox, additionalWritableRoots: ['relative'] } });
+  for (const permissions of [undefined, { ...receipt, preset: 'read-only' }, ...malformedScopes]) await t.test(String(permissions?.sandbox?.workspaceRoot), async t => {
+    const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'create-permission-preset'] }, createResult: { teamId: 'synthetic', permissions } });
+    await assert.rejects(client.request('create', { key: 'permission-receipt', cwd: '/synthetic', text: 'Synthetic task.', permissionPreset: 'danger-full-access' }), { code: 'OUTCOME_UNCERTAIN' });
+    assert.equal(calls.filter(call => call.method === 'create').length, 1);
+  });
 });
 test('MCP preserves released runtime package identity with null sourceSha and admits compatible work', async t => {
   const evidence = { sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.2' } };
