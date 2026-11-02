@@ -53,7 +53,7 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
     });
     const replies = output.trim().split('\n').map(JSON.parse);
     assert.equal(replies[0].result.serverInfo.name, 'dsh-agent-team');
-    assert.equal(replies[1].result.tools.length, 16);
+    assert.equal(replies[1].result.tools.length, 17);
     assert.equal(replies[2].result.structuredContent.ok, true);
     assert.equal(replies[2].result.structuredContent.api.version, 1);
   }

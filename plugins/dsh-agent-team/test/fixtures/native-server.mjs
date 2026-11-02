@@ -104,6 +104,7 @@ export async function serveNativeFixture({ dispatch = async () => ({}), health =
     result(r) { return this.call('result', r); } stop(r) { return this.call('stop', r); }
     turnResult(r) { return this.call('turnResult', r); }
     input(r) { return this.call('input', r); }
+    jobs(r) { return this.call('jobs', r); }
     withdrawInput(r) { return this.call('withdrawInput', r); }
     activity(r) { return this.call('activity', r); } prepareShutdown(r) { return this.call('prepareShutdown', r); }
   }

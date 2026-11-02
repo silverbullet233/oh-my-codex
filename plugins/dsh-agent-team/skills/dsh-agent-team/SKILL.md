@@ -55,6 +55,8 @@ When health advertises `input-observations`, use `dsh_team_input` with the origi
 
 When a known pending input is explicitly no longer wanted and health advertises `live-input-withdrawal`, inspect input evidence then use `dsh_team_withdraw_input` with its exact native message ID. Only a still-live, uniquely matching pending message can be removed. This does not stop running work, undo files or resume cold execution. Preserve uncertain receipts/IDs, never infer withdrawal from absence or resurrect an old input ID, and use a new ID only for explicitly authorized new work. See [withdrawal details](../../docs/interactions.md#live-input-withdrawal-development).
 
+When supported by `owned-job-observations`, use `dsh_team_jobs` for bounded read-only progress of declared Team-owned Jobs, including member-owned Jobs, without consuming model output. Unowned visibility is not ownership. Inspect omissions, scope freshness and unavailable counts; process-local empty results do not prove historical completeness, stopped work, resource release or goal success. Send any execution/control request only through Lead. See [Job observation details](../../docs/interactions.md#owned-job-observations-development).
+
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
 ## Lead questions and approvals
