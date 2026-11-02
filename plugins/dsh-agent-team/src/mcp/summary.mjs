@@ -1,0 +1,76 @@
+/** Opt-in MCP presentation budget; native reads and legacy full results are unchanged. */
+export const SUMMARY_BYTES = 16384;
+const integer = value => Number.isSafeInteger(value) ? value : null;
+const boolean = value => typeof value === 'boolean' ? value : null;
+// Opaque IDs/options must never be made into different identifiers by clipping.
+const id = value => typeof value === 'string' && value.length <= 256 && Buffer.byteLength(value) <= 256 ? value : null;
+const list = value => Array.isArray(value) ? value : null;
+const wrap = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
+const size = value => Buffer.byteLength(JSON.stringify(value));
+
+function preview(value, limit) {
+  if (typeof value !== 'string') return { text: '', available: false, previewTruncated: false, originalWellFormed: null };
+  // A UTF-16 prefix this long already covers the UTF-8 byte budget. Avoid
+  // copying a giant native body just to display its bounded beginning.
+  const prefix = value.slice(0, limit + 2), bytes = Buffer.from(prefix, 'utf8');
+  let end = Math.min(limit, bytes.length);
+  while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
+  return { text: bytes.subarray(0, end).toString('utf8'), available: true, previewTruncated: end < bytes.length || prefix.length < value.length, originalWellFormed: value.isWellFormed() };
+}
+
+function cut(value) {
+  if (!value) return null;
+  const rows = list(value.freshness?.projections);
+  return { asOfSeq: integer(value.asOfSeq), scope: id(value.asOfSeqScope) ?? 'unknown',
+    projections: (rows ?? []).slice(0, 8).map(row => ({ sessionId: id(row?.sessionId), asOfSeq: integer(row?.asOfSeq), unchangedAtCheck: boolean(row?.unchangedAtCheck) })),
+    omittedProjections: rows === null ? null : Math.max(0, rows.length - 8) };
+}
+
+function turns(value) {
+  if (!value) return null;
+  return { latestStarted: value.latestStarted ? { turn: integer(value.latestStarted.turn), startSeq: integer(value.latestStarted.startSeq) } : null,
+    active: integer(value.active), lastEnded: value.lastEnded ? { turn: integer(value.lastEnded.turn), seq: integer(value.lastEnded.seq), reason: id(value.lastEnded.reason) } : null,
+    lastCompleted: value.lastCompleted ? { turn: integer(value.lastCompleted.turn), endSeq: integer(value.lastCompleted.endSeq) } : null };
+}
+
+export function boundedObservation(method, value, request = {}) {
+  const status = method === 'wait' ? value?.status : method === 'status' ? value : null;
+  const result = method === 'wait' ? value?.result : method === 'result' ? value : null;
+  const source = result ?? status;
+  const observation = source?.observation;
+  const text = result?.output ?? observation?.output;
+  const outputSource = result?.outputSource ?? observation?.outputSource;
+  const latestAssistant = result?.latestAssistant ?? observation?.latestAssistant;
+  const members = list(source?.teamActivity?.members) ?? list(source?.team?.members);
+  const inputs = list(result?.inputs ?? observation?.inputs), errors = list(result?.errors ?? observation?.errors);
+  const pending = list(value?.interactions);
+  const summary = {
+    view: 'summary', method, byteBudget: SUMMARY_BYTES, budgetScope: 'tool-result-body-including-text-and-structured-content',
+    teamId: id(value?.teamId ?? status?.sessionId ?? request.teamId), atomic: false, stateSource: result ? 'result' : status ? 'status' : null,
+    state: { taskState: id(source?.taskState), runtimeState: id(source?.runtimeState), rootTurnState: id(source?.rootTurnState),
+      rootTurnCompleted: boolean(source?.rootTurnCompleted), completed: boolean(method === 'status' ? status?.teamCompleted : result?.completed), goalAccepted: null, pendingTasks: integer(source?.teamActivity?.pendingTasks) },
+    sourceCuts: { status: cut(status), result: cut(result) }, turns: turns(result?.turns ?? (observation ? { latestStarted: { turn: observation.turn, startSeq: observation.turnStartSeq }, active: observation.open === true ? observation.turn : null, lastEnded: observation.lastEnd, lastCompleted: observation.lastCompletedTurn } : null)),
+    output: { ...preview(text, 2048), source: outputSource ? { turn: integer(outputSource.turn), seq: integer(outputSource.seq), truncated: boolean(outputSource.truncated) } : null },
+    latestAssistant: latestAssistant ? { turn: integer(latestAssistant.turn), seq: integer(latestAssistant.seq), hasText: boolean(latestAssistant.hasText) } : null,
+    members: { returnedCount: members?.length ?? null, items: (members ?? []).slice(0, 8).map(member => ({ id: id(member?.id), name: id(member?.name), role: id(member?.role), phase: id(member?.phase), runtimeState: id(member?.runtimeState) })), omitted: members === null ? null : Math.max(0, members.length - 8) },
+    retainedEntryCounts: { inputs: inputs?.length ?? null, errors: errors?.length ?? null },
+    details: { endedTurnTextTool: 'dsh_team_turn_result', historicalCapabilityRequired: 'ended-turn-results', fullViewAvailable: true },
+  };
+  if (method === 'wait') {
+    Object.assign(summary, { reason: id(value?.reason), baseline: id(value?.baseline), resynchronized: boolean(value?.resynchronized),
+      pendingInteractions: { count: pending?.length ?? null, questionPayloadIncluded: false, exactDetailsTool: 'dsh_team_pending' } });
+  }
+  let resultBody = wrap(summary);
+  if (size(resultBody) > SUMMARY_BYTES) {
+    summary.reducedForBudget = true;
+    summary.output = { ...summary.output, ...preview(text, 256) };
+    summary.members.items = []; summary.members.omitted = members?.length ?? null;
+    for (const [name, value] of Object.entries(summary.sourceCuts)) if (value) {
+      const original = name === 'status' ? status : result;
+      value.projections = []; value.omittedProjections = list(original?.freshness?.projections)?.length ?? null;
+    }
+    resultBody = wrap(summary);
+  }
+  if (size(resultBody) > SUMMARY_BYTES) throw Object.assign(new Error('Observation summary exceeds its fixed presentation budget; no full payload fallback was returned.'), { code: 'SUMMARY_LIMIT' });
+  return resultBody;
+}
