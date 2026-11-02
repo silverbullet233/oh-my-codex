@@ -82,7 +82,7 @@ export function boundedObservation(method, value, request = {}) {
     details: { endedTurnTextTool: 'dsh_team_turn_result', historicalCapabilityRequired: 'ended-turn-results', fullViewAvailable: true },
   };
   if (method === 'wait') {
-    Object.assign(summary, { reason: id(value?.reason), baseline: id(value?.baseline), resynchronized: boolean(value?.resynchronized),
+    Object.assign(summary, { reason: id(value?.reason), wakeOn: id(value?.wakeOn), baseline: id(value?.baseline), resynchronized: boolean(value?.resynchronized),
       pendingInteractions: { count: pending?.length ?? null, questionPayloadIncluded: false, exactDetailsTool: 'dsh_team_pending' } });
   }
   let resultBody = wrap(summary);

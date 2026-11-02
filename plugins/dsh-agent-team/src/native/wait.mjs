@@ -2,8 +2,31 @@
 import { ClientError } from './errors.mjs';
 import { digest, untilAbort, aborted } from './interactions.mjs';
 import { nativeValue } from './observation.mjs';
-export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after }, callerSignal) {
+
+// State-mode baselines omit event cursors, token attempts and output/progress text.
+// Keep explicit coordination transitions, not an assertion of semantic progress.
+function coordinationState({ status, result }) {
+  const activity = status.teamActivity, observation = status.observation;
+  const jobs = result.execution?.jobs;
+  return {
+    consistent: status.consistent,
+    activity: activity ? { state: activity.state, pendingTasks: activity.pendingTasks,
+      members: activity.members?.map(m => [m.id, m.phase, m.nativeStatus, m.runtimeState, m.observationAvailable, m.openTurn, m.pendingInputs, m.lastTurnOutcome]) } : null,
+    roster: status.team?.members?.map(m => [m.id, m.phase, m.role]),
+    tasks: status.team?.tasks?.map(t => [t.id, t.revision, t.status, t.ownerId]),
+    messages: status.team?.messages?.filter(m => !status.team.delivered?.includes(m.id)).map(m => m.id),
+    failure: status.team?.failure,
+    inbox: status.inbox ? ['next-turn', 'next-step'].map(place => [place, status.inbox[place]?.map(m => [m.id, m.source?.rpcId])]) : null,
+    turns: result.turns ?? (observation ? { turn: observation.turn, open: observation.open, lastEnd: observation.lastEnd } : null),
+    errors: (result.errors ?? observation?.errors)?.map(e => [e.seq, e.code]),
+    execution: result.execution ? { ownedJobsSettled: result.execution.ownedJobsSettled,
+      jobs: jobs ? { available: jobs.available, reason: jobs.reason, ownerScopeUnchangedAtCheck: jobs.ownerScopeUnchangedAtCheck, sameRootCut: jobs.sameRootCut, counts: jobs.counts } : null } : null,
+  };
+}
+
+export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after, wakeOn = 'activity' }, callerSignal) {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 30000) throw new ClientError('INVALID_WAIT', 'Wait timeout must be an integer from 0 to 30000 ms.');
+  if (!['activity', 'state'].includes(wakeOn)) throw new ClientError('INVALID_WAIT', 'Wait wakeOn must be activity or state.');
   if ((gateway.activeWaits ?? 0) >= 4) throw new ClientError('WAIT_BUSY', 'At most four bounded waits may be active.');
   gateway.activeWaits = (gateway.activeWaits ?? 0) + 1;
   const stop = new AbortController(), timer = setTimeout(() => stop.abort(), timeoutMs);
@@ -30,12 +53,15 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
   };
   const signature = current => digest({ instanceId: gateway.entry.instanceId,
     taskState: current.status.taskState, runtimeState: current.status.runtimeState, rootTurnState: current.status.rootTurnState,
-    completed: current.result.completed, activity: current.status.teamActivity,
-    execution: current.result.execution ? { ownedJobsSettled: current.result.execution.ownedJobsSettled, jobs: current.result.execution.jobs } : null,
-    cursors: [...cursors].sort(), states: [...states].sort(), attempts: [...attempts].sort(),
+    completed: current.result.completed,
+    ...(wakeOn === 'state' ? { wakeOn, coordination: coordinationState(current), states: [...states].sort() } : {
+      activity: current.status.teamActivity,
+      execution: current.result.execution ? { ownedJobsSettled: current.result.execution.ownedJobsSettled, jobs: current.result.execution.jobs } : null,
+      cursors: [...cursors].sort(), states: [...states].sort(), attempts: [...attempts].sort(),
+    }),
     pending: gateway.interactions.pending(teamId).map(p => [p.interactionId, p.deliveryId, p.requiresUser]),
   });
-  const output = (reason, current = value) => ({ teamId, reason, baseline: current ? signature(current) : null, resynchronized: repaired,
+  const output = (reason, current = value) => ({ teamId, reason, wakeOn, baseline: current ? signature(current) : null, resynchronized: repaired,
     interactions: gateway.interactions.pending(teamId), ...(current ? { status: current.status, result: current.result } : { status: null, result: null }) });
   const pump = (id, method) => {
     const opening = Promise.withResolvers(); ready.push(opening.promise);
