@@ -51,6 +51,8 @@ Acceptance is separate from admitted input, processing, Lead completion and proc
 
 When health advertises `ended-turn-results`, use `dsh_team_turn_result` to retain an ended Lead turn's `resultRef` before later inputs. Reuse that reference and `page.nextOffset` for complete UTF-8 JSONL text-event reads across turns/reconnects. These audit events preserve replacement markers; they are not a canonical conversation or goal-success verdict. Missing history and scan limits are explicit errors, never latest-result fallback. This is a development capability absent from published host 0.6.0; do not change installation pins or pretend old hosts support it. See [historical read details](../../docs/interactions.md#historical-ended-turn-reads-development).
 
+When health advertises `input-observations`, use `dsh_team_input` with the original root/input IDs to distinguish saved admission from native pending, entered-turn or turn-ended evidence. Cold reads stay passive. Absence is inconclusive because history is bounded; do not automatically resend or claim withdrawal/implementation from these observations. This development query requires a compatible future host, not the published 0.6.0 archive.
+
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
 ## Lead questions and approvals

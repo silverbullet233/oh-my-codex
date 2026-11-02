@@ -93,7 +93,7 @@ test('MCP create/send keep the Lead root and never dispatch member fields or mes
   }
   for (const name of ['dsh_member_send', 'dsh_team_send_member', 'dsh_agent_prompt']) assert.equal((await call(name, { teamId: 'synthetic-child' })).error.code, -32602);
   assert.equal(calls.length, count);
-  assert.equal(tools.length, 14);
+  assert.equal(tools.length, 15);
   assert(tools.find(tool => tool.name === 'dsh_team_send').inputSchema.properties.teamId.description.includes('Lead/root'));
 });
 

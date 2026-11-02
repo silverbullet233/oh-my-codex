@@ -41,6 +41,25 @@ test('historical reads require an additive capability and never fall back to lat
   assert.equal((await client.request('result', { teamId: 'lead' })).accepted, true);
   assert.deepEqual(calls.map(call => call.method), ['health', 'result']);
 });
+test('input evidence requires an additive capability without reading status or resending', async t => {
+  const { client, calls } = await fixture(t);
+  await assert.rejects(client.request('input', { teamId: 'lead', inputId: 'input-1' }), { code: 'CAPABILITY_MISMATCH' });
+  assert.deepEqual(calls.map(call => call.method), ['health']);
+});
+test('MCP input query preserves root/input identity and refuses extra targets before transport', async t => {
+  const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'input-observations'] } });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const params = { teamId: 'lead', inputId: 'queued-input' };
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_input', arguments: params } });
+  assert.equal(response.result.structuredContent.accepted, true);
+  assert.deepEqual(calls.at(-1), { method: 'input', params });
+  const before = calls.length;
+  for (const arguments_ of [{ ...params, memberId: 'bypass' }, { teamId: 'lead' }, { ...params, inputId: '' }]) {
+    assert.equal((await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_input', arguments: arguments_ } })).error.code, -32602);
+  }
+  assert.equal(calls.length, before);
+});
 test('MCP maps historical selectors and opaque pagination exactly to the native Remote', async t => {
   const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'ended-turn-results'] } });
   const dispatch = createDispatcher(client);

@@ -128,6 +128,9 @@ export class GatewayClient {
     if (method === 'turnResult' && !this.lastHealth.api.capabilities.includes('ended-turn-results')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support pinned ended-turn results. A compatible released host is required; no latest-result fallback was used.');
     }
+    if (method === 'input' && !this.lastHealth.api.capabilities.includes('input-observations')) {
+      throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support input evidence. A compatible released host is required; no status fallback or resend was attempted.');
+    }
     if (method === 'stop') this.wake();
     try {
       const result = await this.ctx.remote.roleTeams[method](params);
