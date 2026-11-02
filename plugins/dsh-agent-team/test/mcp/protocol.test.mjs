@@ -46,6 +46,18 @@ test('native refusal remains an explicit tool error without fallback', async () 
   assert.deepEqual(JSON.parse(response.result.content[0].text), { code: 'interaction/unavailable', message: 'Native approval is required.' });
 });
 
+test('MCP validates optional local wait policy and keeps native write controls unavailable', async () => {
+  const calls = [];
+  const dispatch = await initialized({ request: async (method, params) => { calls.push({ method, params }); return { reason: 'timeout', wakeOn: params.wakeOn }; } });
+  const response = await dispatch(rpc('tools/call', { name: 'dsh_team_wait', arguments: { teamId: 'lead', wakeOn: 'state', view: 'summary' } }));
+  assert.deepEqual(calls, [{ method: 'wait', params: { teamId: 'lead', wakeOn: 'state' } }]);
+  assert.equal(response.result.structuredContent.wakeOn, 'state');
+  for (const extra of [{ wakeOn: 'tokens' }, { member: 'other' }, { activate: true }]) {
+    assert.equal((await dispatch(rpc('tools/call', { name: 'dsh_team_wait', arguments: { teamId: 'lead', ...extra } }))).error.code, -32602);
+  }
+  assert.equal(calls.length, 1);
+});
+
 test('unknown RPC requests fail without running native work', async () => {
   const dispatch = await initialized({ request: async () => { assert.fail('must not reach bridge'); } });
   assert.equal((await dispatch(rpc('shutdown'))).error.code, -32601);

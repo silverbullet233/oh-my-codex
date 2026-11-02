@@ -75,7 +75,7 @@ test('member state changes wake a wait, completion is authoritative and streams 
 test('pending-only questions wake waits without observeState, and cancellation leaves answers responsive', { timeout: 10000 }, async t => {
   const { client, server, state } = await interactionFixture(t);
   const controller = new AbortController();
-  const waiting = client.request('wait', { teamId: 'lead', timeoutMs: 1000 }, { signal: controller.signal });
+  const waiting = client.request('wait', { teamId: 'lead', timeoutMs: 1000, wakeOn: 'state' }, { signal: controller.signal });
   await opened(server);
   const native = server.interaction('user-questions/request', 'lead', { questions: [{ id: 'q', question: 'Need existing scope?' }] });
   const result = await waiting; assert.equal(result.reason, 'interaction'); await drained(server);

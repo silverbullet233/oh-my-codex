@@ -12,12 +12,12 @@ function observation() {
   const gateway = {
     entry: { instanceId: 'boundary' }, waitLifetime: new AbortController(), waiters: new Set(), ready: async () => {}, refreshPending: async () => {},
     interactions: { onChange: () => () => {}, pending: () => [] },
-    ctx: { remote: { roleTeams: { result: async () => ({ ok: true, value: { completed: state.completed } }) } } },
+    ctx: { remote: { roleTeams: { result: async () => ({ ok: true, value: { completed: state.completed, ...state.result } }) } } },
     observation: {
       async managed(teamId, signal) {
         state.readSignal = signal;
         if (state.readGate) await untilAbort(state.readGate.promise, signal);
-        return { teamId, sessionId: teamId, team: { members: state.roster.map(id => ({ id })) } };
+        return { teamId, sessionId: teamId, team: { members: state.roster.map(id => ({ id })) }, ...state.status };
       },
       async *stream(method, request, signal) {
         const id = request.address?.childSessionId ?? request.address?.sessionId ?? request.sessionId, key = `${id}:${method}`, channel = new Channel();
@@ -31,6 +31,91 @@ function observation() {
   };
   return { gateway, state, streams, opened };
 }
+
+test('state waits coalesce committed events, assistant attempts and output without hiding activity mode', async t => {
+  for (const wakeOn of ['state', 'activity']) await t.test(wakeOn, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { gateway, state, streams } = observation();
+    state.status = { teamActivity: { state: 'running', pendingTasks: 1, members: [], incidentalCursor: 0 } };
+    state.result = { execution: { ownedJobsSettled: false, jobs: { available: true, counts: { running: 1 }, rootAsOfSeq: 0 } } };
+    let settled = false;
+    const waiting = waitForTeam(gateway, { teamId: 'lead', timeoutMs: 1000, wakeOn }, new AbortController().signal).then(value => { settled = true; return value; });
+    await turn();
+    const follow = streams.get('lead:follow');
+    follow.push({ type: 'event', event: { seq: 1, type: 'tool/call' } });
+    follow.push({ type: 'assistant-stream', frame: { type: 'start', attemptId: 'new-attempt' } });
+    state.status.teamActivity.incidentalCursor++;
+    state.result.output = 'More internal text'; state.result.execution.jobs.rootAsOfSeq++;
+    await turn(); t.mock.timers.tick(25); await turn();
+    assert.equal(settled, wakeOn === 'activity');
+    if (wakeOn === 'state') { t.mock.timers.tick(975); await turn(); }
+    const result = await waiting;
+    assert.equal(result.reason, wakeOn === 'state' ? 'timeout' : 'changed');
+    assert.equal(result.wakeOn, wakeOn); assert.equal(streams.size, 0);
+  });
+});
+
+test('state waits retain task, inbox, member, turn, Job and error transitions', async t => {
+  const changes = {
+    task: state => { state.status.team.tasks[0].revision++; },
+    inbox: state => { state.status.inbox['next-turn'][0].id = 'replacement-input'; },
+    member: state => { state.status.teamActivity.members[0].phase = 'failed'; },
+    turn: state => { state.result.turns.latestStarted.turn++; },
+    job: state => { state.result.execution.jobs.counts = { running: 0, stopping: 1 }; },
+    error: state => { state.result.errors.push({ seq: 3, code: 'native/failure' }); },
+  };
+  for (const [name, change] of Object.entries(changes)) await t.test(name, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { gateway, state, streams } = observation();
+    state.status = { team: { members: [{ id: 'lead' }], tasks: [{ id: 't', revision: 1, status: 'in_progress' }] },
+      inbox: { 'next-turn': [{ id: 'original' }], 'next-step': [] }, teamActivity: { members: [{ id: 'lead', phase: 'active' }] } };
+    state.result = { turns: { latestStarted: { turn: 1 } }, errors: [], execution: { ownedJobsSettled: false, jobs: { counts: { running: 1 } } } };
+    const waiting = waitForTeam(gateway, { teamId: 'lead', timeoutMs: 1000, wakeOn: 'state' }, new AbortController().signal);
+    await turn(); change(state);
+    streams.get('lead:follow').push({ type: 'event', event: { seq: 1 } });
+    await turn(); t.mock.timers.tick(25);
+    assert.equal((await waiting).reason, 'changed'); assert.equal(streams.size, 0);
+  });
+});
+
+test('state mode prioritizes completion, repairs sequence gaps and remains cancellable', async t => {
+  for (const action of ['completed', 'gap', 'cancelled']) await t.test(action, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { gateway, state, streams } = observation(), controller = new AbortController();
+    const waiting = waitForTeam(gateway, { teamId: 'lead', timeoutMs: 1000, wakeOn: 'state' }, controller.signal);
+    await turn();
+    if (action === 'cancelled') controller.abort();
+    else {
+      state.completed = action === 'completed';
+      streams.get('lead:follow').push({ type: 'event', event: { seq: action === 'gap' ? 5 : 1 } });
+      await turn(); t.mock.timers.tick(25);
+    }
+    const result = await waiting;
+    assert.equal(result.reason, action === 'gap' ? 'changed' : action);
+    assert.equal(result.resynchronized, action === 'gap'); assert.equal(streams.size, 0);
+  });
+});
+
+test('invalid wait policies fail before native observation', async () => {
+  const { gateway } = observation();
+  gateway.ready = () => assert.fail('invalid policy must not connect');
+  await assert.rejects(waitForTeam(gateway, { teamId: 'lead', wakeOn: 'tokens' }, new AbortController().signal), { code: 'INVALID_WAIT' });
+});
+
+test('state baselines survive event-only changes across calls and changing policy replaces the baseline', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { gateway, streams } = observation();
+  const first = waitForTeam(gateway, { teamId: 'lead', timeoutMs: 100, wakeOn: 'state' }, new AbortController().signal);
+  await turn(); t.mock.timers.tick(100);
+  const baseline = (await first).baseline;
+  const next = waitForTeam(gateway, { teamId: 'lead', timeoutMs: 100, wakeOn: 'state', after: baseline }, new AbortController().signal);
+  await turn(); streams.get('lead:follow').push({ type: 'event', event: { seq: 1 } });
+  await turn(); t.mock.timers.tick(25); await turn(); t.mock.timers.tick(75);
+  const result = await next;
+  assert.equal(result.reason, 'timeout'); assert.equal(result.baseline, baseline);
+  const replacement = await waitForTeam(gateway, { teamId: 'lead', timeoutMs: 100, after: baseline }, new AbortController().signal);
+  assert.equal(replacement.reason, 'changed'); assert.equal(replacement.wakeOn, 'activity'); assert.notEqual(replacement.baseline, baseline);
+});
 
 test('roster replacements cannot exceed the accumulated observation bound', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
