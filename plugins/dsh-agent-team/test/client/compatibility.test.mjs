@@ -34,6 +34,28 @@ test('explicit permission intent requires host support without fallback; default
   await assert.rejects(client.request('create', params), { code: 'CAPABILITY_MISMATCH' });
   assert.deepEqual(calls.map(call => call.method), ['health']);
 });
+test('historical reads require an additive capability and never fall back to latest', async t => {
+  const { client, calls } = await fixture(t);
+  await assert.rejects(client.request('turnResult', { teamId: 'lead', turn: 1 }), { code: 'CAPABILITY_MISMATCH' });
+  assert.deepEqual(calls.map(call => call.method), ['health']);
+  assert.equal((await client.request('result', { teamId: 'lead' })).accepted, true);
+  assert.deepEqual(calls.map(call => call.method), ['health', 'result']);
+});
+test('MCP maps historical selectors and opaque pagination exactly to the native Remote', async t => {
+  const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'ended-turn-results'] } });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  for (const params of [{ teamId: 'lead', turn: 1, maxBytes: 997 }, { teamId: 'lead', resultRef: 'opaque-history-ref', offset: 997, maxBytes: 4093 }]) {
+    const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_turn_result', arguments: params } });
+    assert.equal(response.result.structuredContent.accepted, true);
+    assert.deepEqual(calls.at(-1), { method: 'turnResult', params });
+  }
+  const before = calls.length;
+  for (const params of [{ teamId: 'lead', turn: 0 }, { teamId: 'lead', turn: 1, maxBytes: 32769 }, { teamId: 'lead', resultRef: 'x'.repeat(2049) }]) {
+    assert.equal((await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_turn_result', arguments: params } })).error.code, -32602);
+  }
+  assert.equal(calls.length, before);
+});
 test('MCP forwards exact explicit preset and reports actual configured permissions', async t => {
   const permissions = { preset: 'danger-full-access', sandbox: { mode: 'workspace-write', workspaceRoot: '/synthetic' }, approvalPolicy: 'ask', asOfSeq: 5 };
   const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'create-permission-preset'] }, createResult: { teamId: 'synthetic', accepted: true, permissions } });

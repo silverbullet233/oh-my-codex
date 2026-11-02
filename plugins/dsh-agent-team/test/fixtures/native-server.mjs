@@ -102,6 +102,7 @@ export async function serveNativeFixture({ dispatch = async () => ({}), health =
     health(r) { return this.call('health', r); } create(r) { return this.call('create', r); }
     send(r) { return this.call('send', r); } status(r) { return this.call('status', r); }
     result(r) { return this.call('result', r); } stop(r) { return this.call('stop', r); }
+    turnResult(r) { return this.call('turnResult', r); }
     activity(r) { return this.call('activity', r); } prepareShutdown(r) { return this.call('prepareShutdown', r); }
   }
   await ctx.plugin(FixtureRemote);
