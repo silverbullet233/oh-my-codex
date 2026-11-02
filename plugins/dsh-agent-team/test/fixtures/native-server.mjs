@@ -53,7 +53,11 @@ export async function serveNativeFixture({ dispatch = async () => ({}), health =
     }
     async *live(method, request, signal) {
       calls.push({ method, request });
-      const id = request.address?.sessionId ?? request.sessionId, data = session(id), channel = new Channel(), key = `${id}:${method}`;
+      const id = request.address?.childSessionId ?? request.address?.sessionId ?? request.sessionId, data = session(id), channel = new Channel(), key = `${id}:${method}`;
+      if (request.address && data.header.origin === 'subagent') {
+        if (request.address.kind === 'session') throw new RemoteError('session/agent-busy', 'subagent Sessions require their durable parent address', {});
+        if (request.address.parentSessionId !== data.header.parentSession) throw new RemoteError('subagent/unauthorized', 'subagent does not belong to the supplied parent', {});
+      }
       const listeners = streams.get(key) ?? new Set(); streams.set(key, listeners); listeners.add(channel);
       try {
         yield method === 'follow' ? { type: 'snapshot', header: data.header, cursor: data.cursor, records: data.records, hasMore: data.hasMore, projections: data.projections } : data.state;

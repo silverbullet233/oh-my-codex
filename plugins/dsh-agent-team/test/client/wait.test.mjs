@@ -3,6 +3,35 @@ import assert from 'node:assert/strict';
 import { interactionFixture, eventually } from '../fixtures/interactions.mjs';
 const opened = server => eventually(() => server.streams.get('member:follow')?.size && server.streams.get('lead:observeState')?.size);
 const drained = server => eventually(() => [...server.streams.values()].every(set => !set.size));
+test('wait observes cold native subagents through their durable parent address', { timeout: 10000 }, async t => {
+  const { client, server } = await interactionFixture(t);
+  const member = server.session('member');
+  member.header.origin = 'subagent'; member.state.active = false;
+  // Match the pinned native boundary rather than accepting an ordinary
+  // Session address for a child, as the original transport fixture did.
+  await assert.rejects(client.observation.opening('member', AbortSignal.timeout(1000)), { code: 'session/agent-busy' });
+  const controller = new AbortController();
+  const waiting = client.request('wait', { teamId: 'lead', timeoutMs: 5000 }, { signal: controller.signal });
+  await opened(server); controller.abort();
+  assert.equal((await waiting).reason, 'cancelled'); await drained(server);
+  const childCalls = server.calls.filter(c => c.method === 'follow' && c.request.address.childSessionId === 'member');
+  assert(childCalls.length > 0);
+  for (const { request } of childCalls) {
+    assert.deepEqual(request.address, { kind: 'subagent', parentSessionId: 'lead', childSessionId: 'member', mode: 'unknown' });
+    assert.equal(request.activate, undefined); assert.equal(request.afterSeq, undefined);
+  }
+  assert.equal(member.state.active, false);
+  const rootCall = server.calls.find(c => c.method === 'follow' && c.request.address.sessionId === 'lead');
+  assert.deepEqual(rootCall.request.address, { kind: 'session', sessionId: 'lead' });
+});
+test('wait refuses a child with a foreign parent without falling back to another address', { timeout: 10000 }, async t => {
+  const { client, server } = await interactionFixture(t);
+  server.session('member').header.origin = 'subagent';
+  server.session('member').header.parentSession = 'other';
+  await assert.rejects(client.request('wait', { teamId: 'lead', timeoutMs: 1000 }), { code: 'subagent/unauthorized' });
+  await drained(server);
+  assert.equal(server.calls.some(c => c.method === 'follow' && c.request.address.sessionId === 'member'), false);
+});
 test('bounded passive wait times out, ignores token chunks, and requires whole-Team completion', { timeout: 10000 }, async t => {
   const { client, server } = await interactionFixture(t);
   const waiting = client.request('wait', { teamId: 'lead', timeoutMs: 150 });

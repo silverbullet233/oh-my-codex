@@ -44,7 +44,9 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
         let first = true;
         try {
           await untilAbort(gateway.ready(), signal);
-          const request = method === 'follow' ? { address: { kind: 'session', sessionId: id }, assistantStream: true, maxMessages: 1 } : { sessionId: id };
+          const address = id === teamId ? { kind: 'session', sessionId: id }
+            : { kind: 'subagent', parentSessionId: teamId, childSessionId: id, mode: 'unknown' };
+          const request = method === 'follow' ? { address, assistantStream: true, maxMessages: 1 } : { sessionId: id };
           for await (const frame of gateway.observation.stream(method, request, signal)) {
             if (method === 'observeState') {
               if (!Number.isSafeInteger(frame.cursor) || typeof frame.active !== 'boolean' || typeof frame.running !== 'boolean') throw new ClientError('INVALID_BASELINE', 'Invalid native Session state.');
