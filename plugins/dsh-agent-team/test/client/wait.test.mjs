@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import { interactionFixture, eventually } from '../fixtures/interactions.mjs';
 const opened = server => eventually(() => server.streams.get('member:follow')?.size && server.streams.get('lead:observeState')?.size);
 const drained = server => eventually(() => [...server.streams.values()].every(set => !set.size));
+test('wait retains owned Job settlement evidence and notices count changes before terminal completion', { timeout: 10000 }, async t => {
+  const { client, server, state } = await interactionFixture(t);
+  state.execution = { nativeTeamCompleted: true, ownedJobsSettled: false, jobs: { available: true, counts: { running: 1, stopping: 0 } } };
+  const first = await client.request('wait', { teamId: 'lead', timeoutMs: 50 });
+  assert.equal(first.reason, 'timeout'); assert.equal(first.result.execution.ownedJobsSettled, false); await drained(server);
+  state.execution.jobs.counts = { running: 0, stopping: 1 };
+  const stopping = await client.request('wait', { teamId: 'lead', timeoutMs: 50, after: first.baseline });
+  assert.equal(stopping.reason, 'changed'); assert.equal(stopping.result.completed, false); await drained(server);
+  state.completed = true; state.execution.ownedJobsSettled = true; state.execution.jobs.counts = { running: 0, stopping: 0 };
+  assert.equal((await client.request('wait', { teamId: 'lead', timeoutMs: 50, after: stopping.baseline })).reason, 'completed'); await drained(server);
+});
 test('wait observes cold native subagents through their durable parent address', { timeout: 10000 }, async t => {
   const { client, server } = await interactionFixture(t);
   const member = server.session('member');

@@ -47,6 +47,15 @@ function turns(value) {
     lastCompleted: value.lastCompleted ? { turn: integer(value.lastCompleted.turn), endSeq: integer(value.lastCompleted.endSeq) } : null };
 }
 
+function execution(value) {
+  if (!value) return null;
+  return { nativeTeamCompleted: boolean(value.nativeTeamCompleted), ownedJobsSettled: boolean(value.ownedJobsSettled),
+    scope: id(value.scope), atomic: false, admissionBarrier: boolean(value.admissionBarrier), resourceReleaseVerified: false, goalAccepted: null,
+    jobs: { available: boolean(value.jobs?.available), reason: id(value.jobs?.reason), rootAsOfSeq: integer(value.jobs?.rootAsOfSeq),
+      ownerScopeUnchangedAtCheck: boolean(value.jobs?.ownerScopeUnchangedAtCheck), sameRootCut: boolean(value.jobs?.sameRootCut),
+      counts: value.jobs?.counts ? Object.fromEntries(['running', 'stopping', 'completed', 'killed', 'failed'].map(key => [key, integer(value.jobs.counts[key])])) : null } };
+}
+
 export function boundedObservation(method, value, request = {}) {
   const status = method === 'wait' ? value?.status : method === 'status' ? value : null;
   const result = method === 'wait' ? value?.result : method === 'result' ? value : null;
@@ -63,6 +72,8 @@ export function boundedObservation(method, value, request = {}) {
     teamId: id(value?.teamId ?? status?.sessionId ?? request.teamId), atomic: false, stateSource: result ? 'result' : status ? 'status' : null,
     state: { taskState: id(source?.taskState), runtimeState: id(source?.runtimeState), rootTurnState: id(source?.rootTurnState),
       rootTurnCompleted: boolean(source?.rootTurnCompleted), completed: boolean(method === 'status' ? status?.teamCompleted : result?.completed), goalAccepted: null, pendingTasks: integer(source?.teamActivity?.pendingTasks) },
+    completionScope: method === 'status' ? 'native-team-only' : result?.execution ? 'native-team-and-observed-owned-jobs' : 'legacy-native-result',
+    execution: execution(result?.execution),
     sourceCuts: { status: cut(status), result: cut(result) }, turns: turns(result?.turns ?? (observation ? { latestStarted: { turn: observation.turn, startSeq: observation.turnStartSeq }, active: observation.open === true ? observation.turn : null, lastEnded: observation.lastEnd, lastCompleted: observation.lastCompletedTurn } : null)),
     output: { ...preview(text, 2048), source: outputSource ? { turn: integer(outputSource.turn), seq: integer(outputSource.seq), truncated: boolean(outputSource.truncated) } : null },
     latestAssistant: latestAssistant ? { turn: integer(latestAssistant.turn), seq: integer(latestAssistant.seq), hasText: boolean(latestAssistant.hasText) } : null,
