@@ -125,6 +125,9 @@ export class GatewayClient {
       && !this.lastHealth.api.capabilities.includes('create-permission-preset')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support explicit create-time permission presets. No work was submitted; do not drop the requested preset or fall back.');
     }
+    if (method === 'turnResult' && !this.lastHealth.api.capabilities.includes('ended-turn-results')) {
+      throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support pinned ended-turn results. A compatible released host is required; no latest-result fallback was used.');
+    }
     if (method === 'stop') this.wake();
     try {
       const result = await this.ctx.remote.roleTeams[method](params);

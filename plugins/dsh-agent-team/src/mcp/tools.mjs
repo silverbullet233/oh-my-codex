@@ -11,6 +11,7 @@ export const tools = [
   { name: 'dsh_team_send', description: 'Send text only to the same managed Lead/root Session; Lead coordinates member instructions. Explicitly continue interrupted or cold execution. Use English follow-ups/questions and require English replies from Lead.', inputSchema: object({ teamId, inputId: string('Durable input ID; reuse after uncertain outcomes.'), text: string('English follow-up, question or review feedback; request English replies from Lead. Preserve exact code, paths and quoted material.'), mode: { type: 'string', enum: ['queue', 'steer'] }, continue: { type: 'boolean' } }, ['teamId', 'inputId', 'text']) },
   { name: 'dsh_team_status', description: 'Read native runtime and task states, member routes, activity and errors.', inputSchema: object({ teamId }, ['teamId']) },
   { name: 'dsh_team_result', description: 'Read the native Session result and completion evidence. Unknown usage and costs remain unknown.', inputSchema: object({ teamId }, ['teamId']) },
+  { name: 'dsh_team_turn_result', description: 'Read one ended Lead turn from public cold-safe native history. Select exactly one positive turn or returned resultRef. UTF-8 pages form an assistant-text JSONL event transcript, including replacement markers; this is not a canonical conversation or goal-success verdict. Follow nextOffset using the SAME resultRef. Missing/changed history never falls back to latest. Requires host ended-turn-results capability.', inputSchema: object({ teamId, turn: { type: 'integer', minimum: 1 }, resultRef: { ...string('Opaque immutable ended-turn reference; retain unchanged across pages/reconnects.'), maxLength: 2048 }, offset: { type: 'integer', minimum: 0, description: 'UTF-8 byte offset. Nonzero offsets require resultRef; use page.nextOffset.' }, maxBytes: { type: 'integer', minimum: 4, maximum: 32768, description: 'Page text byte budget; default 8192.' } }, ['teamId']) },
   { name: 'dsh_team_stop', description: 'Cancel native execution. File changes are not rolled back.', inputSchema: object({ teamId }, ['teamId']) },
 ];
 
@@ -29,7 +30,7 @@ tools.push(
   { name: 'dsh_team_wait', description: 'Wait on native passive follow/state streams for meaningful Team change, pending interactions, authoritative whole-Team completion or timeout. Token chunks are coalesced inside the client. Waits can run alongside stop/answers and support MCP cancellation. Observation timeout <=30s plus at most 1s for a final authoritative read.', inputSchema: object({ teamId, timeoutMs: { type: 'integer', minimum: 0, maximum: 30000 }, after: string('Optional opaque baseline from a previous wait; this is not native afterSeq.') }, ['teamId']) },
 );
 
-export const methods = new Map(tools.map((tool) => [tool.name, tool.name.replace('dsh_team_', '')]));
+export const methods = new Map(tools.map((tool) => [tool.name, tool.name === 'dsh_team_turn_result' ? 'turnResult' : tool.name.replace('dsh_team_', '')]));
 
 /** Validate the deliberately small JSON schema, including typed answer batches. */
 export function validateArguments(schema, value) {
