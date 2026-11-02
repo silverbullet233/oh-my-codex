@@ -25,11 +25,14 @@ test('Linux browser handoff returns while its launcher lives and never returns a
   assert.doesNotMatch(JSON.stringify(result), /token|synthetic-launch-secret/);
 });
 
-test('failed browser spawn or early exit returns a capability-free error', async t => {
+test('failed browser spawn or exit before handoff returns a capability-free error', { timeout: 10000 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-browser-failure-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const url = 'http://127.0.0.1:12345/?token=synthetic-launch-secret';
   await assert.rejects(handoffBrowser(url, { platform: 'linux', env: { PATH: root } }), { code: 'WEB_OPEN_FAILED' });
   await writeFile(join(root, 'xdg-open'), ['#!/bin/sh', 'exit 7', ''].join('\n'), { mode: 0o700 });
+  // Observe the actual child exit before advancing the handoff deadline. OS
+  // scheduling under parallel tests need not run even this script within 250ms.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   await assert.rejects(handoffBrowser(url, { platform: 'linux', env: { PATH: root } }), error => error.code === 'WEB_OPEN_FAILED' && !error.message.includes('synthetic-launch-secret'));
 });
