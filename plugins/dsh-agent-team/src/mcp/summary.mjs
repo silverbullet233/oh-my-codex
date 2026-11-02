@@ -8,6 +8,20 @@ const list = value => Array.isArray(value) ? value : null;
 const wrap = value => ({ content: [{ type: 'text', text: JSON.stringify(value) }], structuredContent: value });
 const size = value => Buffer.byteLength(JSON.stringify(value));
 
+/** Native failures are still tool results and must obey the same opt-in budget. */
+export function boundedObservationError(error) {
+  const nativeCode = error?.code;
+  const code = id(nativeCode) ?? 'native/unavailable';
+  const detail = { code, message: typeof error?.message === 'string' ? error.message : 'Native operation failed.',
+    ...(nativeCode !== undefined && code !== nativeCode ? { codeOmitted: true } : {}) };
+  const errorBody = value => ({ isError: true, content: [{ type: 'text', text: JSON.stringify(value) }] });
+  if (detail.message.length <= SUMMARY_BYTES) {
+    const body = errorBody(detail);
+    if (size(body) <= SUMMARY_BYTES) return body;
+  }
+  return errorBody({ ...detail, message: 'Native error detail exceeded the summary presentation budget and was omitted. Request full view only if the complete detail is necessary.', messageOmitted: true });
+}
+
 function preview(value, limit) {
   if (typeof value !== 'string') return { text: '', available: false, previewTruncated: false, originalWellFormed: null };
   // A UTF-16 prefix this long already covers the UTF-8 byte budget. Avoid

@@ -62,7 +62,9 @@ test('summary works through pinned native transport without a new host capabilit
   ]);
   const owned = await ownedFixture(t), calls = [];
   const server = await serveNativeFixture({ dispatch: async (method, params) => {
-    calls.push({ method, params }); return method === 'result' ? { teamId: 'lead', completed: null, output: '中文🙂'.repeat(5000), asOfSeq: 10, inputs: [{ id: 'retained' }] } : {};
+    calls.push({ method, params });
+    if (method === 'status') throw Object.assign(new Error('中文🙂'.repeat(5000)), { code: 'team-roles/NATIVE_ERROR_LARGE' });
+    return method === 'result' ? { teamId: 'lead', completed: null, output: '中文🙂'.repeat(5000), asOfSeq: 10, inputs: [{ id: 'retained' }] } : {};
   } });
   const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
   t.after(async () => { await client.close(); await server.close(); });
@@ -72,6 +74,10 @@ test('summary works through pinned native transport without a new host capabilit
   assert.equal(reply.result.structuredContent.sourceCuts.result.scope, 'unknown'); assert.equal(reply.result.structuredContent.output.source, null);
   assert.deepEqual(calls.map(c => c.method), ['health', 'result']); assert.deepEqual(calls[1].params, { teamId: 'lead' });
   assert.equal(client.lastHealth.api.capabilities.includes('ended-turn-results'), false);
+  const failed = (await dispatch(rpc(3, 'dsh_team_status', { teamId: 'lead', view: 'summary' }))).result;
+  assert.equal(failed.isError, true); assert(bytes(failed) <= SUMMARY_BYTES);
+  assert.equal(JSON.parse(failed.content[0].text).code, 'team-roles/NATIVE_ERROR_LARGE');
+  assert.equal(JSON.parse(failed.content[0].text).messageOmitted, true);
 });
 
 test('MCP summary is opt-in, strips presentation arguments and preserves full native payloads by default', async () => {
@@ -103,4 +109,26 @@ test('summary presentation cannot widen exact read authority or native errors', 
   await failing({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   const result = await failing(rpc(2, 'dsh_team_result', { teamId: 'lead', view: 'summary' }));
   assert.equal(result.result.isError, true); assert.match(result.result.content[0].text, /HISTORY_UNAVAILABLE/);
+});
+
+test('summary native error paths obey the budget for long, multibyte and escaped details', async () => {
+  for (const message of ['x'.repeat(20000), '中文🙂'.repeat(5000), '\u0001'.repeat(3000)]) {
+    const error = Object.assign(new Error(message), { code: 'NATIVE_FAILURE' });
+    const dispatch = createDispatcher({ request: async () => { throw error; } });
+    await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+    const summary = (await dispatch(rpc(2, 'dsh_team_result', { teamId: 'lead', view: 'summary' }))).result;
+    assert.equal(summary.isError, true); assert(bytes(summary) <= SUMMARY_BYTES);
+    const detail = JSON.parse(summary.content[0].text);
+    assert.equal(detail.code, 'NATIVE_FAILURE'); assert.equal(detail.messageOmitted, true); assert.equal(detail.message.isWellFormed(), true);
+    const full = (await dispatch(rpc(3, 'dsh_team_result', { teamId: 'lead', view: 'full' }))).result;
+    assert.equal(JSON.parse(full.content[0].text).message, message);
+  }
+  const short = '授权范围不足🙂';
+  const dispatch = createDispatcher({ request: async () => { throw Object.assign(new Error(short), { code: 'SCOPE_DENIED' }); } });
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  assert.deepEqual(JSON.parse((await dispatch(rpc(2, 'dsh_team_status', { teamId: 'lead', view: 'summary' }))).result.content[0].text), { code: 'SCOPE_DENIED', message: short });
+  const largeCode = createDispatcher({ request: async () => { throw Object.assign(new Error('short'), { code: 'x'.repeat(20000) }); } });
+  await largeCode({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const failure = (await largeCode(rpc(2, 'dsh_team_wait', { teamId: 'lead', view: 'summary' }))).result;
+  assert(bytes(failure) <= SUMMARY_BYTES); assert.equal(JSON.parse(failure.content[0].text).codeOmitted, true);
 });
