@@ -7,6 +7,17 @@ import { createExactRequestClient } from '../../src/mcp/exact-request.mjs';
 const bytes = value => Buffer.byteLength(JSON.stringify(value));
 const rpc = (id, name, args) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
 
+test('summary preserves scoped Job evidence, conservative unknown and the body budget', () => {
+  const evidence = { nativeTeamCompleted: true, ownedJobsSettled: false, atomic: false, admissionBarrier: false, goalAccepted: null,
+    jobs: { available: true, rootAsOfSeq: 8, ownerScopeUnchangedAtCheck: true, sameRootCut: true, counts: { running: 1, stopping: 0, completed: 0, killed: 0, failed: 0 } } };
+  const result = boundedObservation('result', { completed: false, execution: evidence });
+  assert.equal(result.structuredContent.execution.nativeTeamCompleted, true); assert.equal(result.structuredContent.execution.ownedJobsSettled, false);
+  assert.equal(result.structuredContent.state.completed, false); assert.equal(result.structuredContent.execution.admissionBarrier, false);
+  assert.equal(result.structuredContent.completionScope, 'native-team-and-observed-owned-jobs'); assert(bytes(result) <= SUMMARY_BYTES);
+  assert.equal(boundedObservation('result', { completed: null }).structuredContent.execution, null);
+  assert.equal(boundedObservation('status', { teamCompleted: true }).structuredContent.completionScope, 'native-team-only');
+});
+
 test('huge native observations produce bounded Unicode previews and explicit omissions', () => {
   const raw = { teamId: 'lead', completed: null, output: '中文🙂'.repeat(10000), outputSource: { turn: 2, seq: 9, truncated: true },
     inputs: Array.from({ length: 4096 }, () => ({ text: 'OMITTED_INPUT_PAYLOAD' })), errors: [{ message: 'OMITTED_ERROR_PAYLOAD' }],

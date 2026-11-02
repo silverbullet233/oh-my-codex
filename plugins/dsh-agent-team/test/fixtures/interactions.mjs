@@ -15,7 +15,7 @@ export async function interactionFixture(t) {
       if (request.teamId !== 'lead') throw Object.assign(new Error('Unknown managed root'), { code: 'team-roles/UNKNOWN_TEAM' });
       return { teamId: 'lead', sessionId: 'lead', runtimeState: state.runtimeState, team: { members: [{ id: 'lead', role: 'lead', phase: 'active' }, { id: 'member', role: 'worker', phase: 'active' }] } };
     }
-    if (method === 'result') { state.reads++; return { completed: state.completed }; }
+    if (method === 'result') { state.reads++; return { completed: state.completed, ...(state.execution === undefined ? {} : { execution: state.execution }) }; }
     return {};
   } });
   server.session('member').header.parentSession = 'lead';

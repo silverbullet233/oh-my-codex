@@ -33,6 +33,14 @@ With `owned-job-observations`, `dsh_team_jobs` reads metadata for the managed ro
 
 `rootAsOfSeq` scopes the roster read; its identity/sequence follow-up check is not an atomic Team/Job snapshot. Unavailable counts remain null. The process-local registry drops records, so empty/cold results are not historical completeness, stopped execution, resource-release or goal-acceptance evidence. Cold reads never activate work. Ask Lead for any Job control or underlying evidence. This capability is unreleased and absent from host 0.6.0; installation pins stay unchanged.
 
+## Job-aware stop and completion (development)
+
+Capability `job-aware-execution` is unreleased and absent from host 0.6.0. With it, `result.completed` combines the native Team verdict with known settled owned Job records; `nativeTeamCompleted` preserves the separate Session/Task verdict. Missing, cold or stale Job evidence stays unknown. Status remains the Session/Task view. Summary preserves execution counts and source cuts; wait compares Job settlement evidence and still uses authoritative result completion. Older hosts lack this Job coverage.
+
+Team stop requests normal native cancellation of verifiable live root/roster-owned Jobs before interrupting turns, excluding unowned and unrelated Jobs. Cold/replaced/reparented owner identities fail closed. Outcomes sample at most 25 entries with counts/omissions; control itself is not limited to that sample. Requested cancellation can remain stopping or fail. `accepted` is separate from `quiescent`; unknown/open/provisioning/pending work or unsettled Jobs prevents a positive quiescence report.
+
+These are bounded observations and cooperative requests, not a global admission fence, safe-restart guarantee or proof of OS resource release. Execution metadata explicitly reports those limits and goal acceptance stays null, including when Job records end failed/killed. Stop preserves inboxes, task records and files. Inspect retained inputs and explicitly choose keep/withdraw/resume within existing authority before further sends; never resume cold work to clear its queue or infer completion from process exit. Version/checksum pins stay unchanged.
+
 ## Approval boundary
 
 `kind: "approval"` covers native approvals and permission-shaped question intents. The answer tool refuses both. Use `dsh_team_approval` to `deny`, or to `approve` with `authorization` quoting the user's explicit permission for that exact action. Never invent authorization, infer it from a task report, grant blanket permission or choose `always`. Missing authorization never grants access.
