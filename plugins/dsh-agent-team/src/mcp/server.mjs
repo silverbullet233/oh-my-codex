@@ -1,4 +1,5 @@
 import { tools, methods, validateArguments } from './tools.mjs';
+import { boundedObservation, boundedObservationError } from './summary.mjs';
 
 const protocolVersions = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -26,9 +27,13 @@ export function createDispatcher(client) {
       try { args = validateArguments(definition.inputSchema, request.params.arguments ?? {}); }
       catch (error) { return { ...response, error: { code: -32602, message: error.message } }; }
       try {
-        const result = await client.request(methods.get(definition.name), args, options);
+        const { view, ...nativeArgs } = args;
+        const method = methods.get(definition.name);
+        const result = await client.request(method, nativeArgs, options);
+        if (view === 'summary') return { ...response, result: boundedObservation(method, result, nativeArgs) };
         return { ...response, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } };
       } catch (error) {
+        if (args.view === 'summary') return { ...response, result: boundedObservationError(error) };
         return { ...response, result: { isError: true, content: [{ type: 'text', text: JSON.stringify({ code: error.code ?? 'native/unavailable', message: error.message }) }] } };
       }
     } catch (error) {
