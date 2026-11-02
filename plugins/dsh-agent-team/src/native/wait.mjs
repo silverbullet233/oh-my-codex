@@ -31,6 +31,7 @@ export async function waitForTeam(gateway, { teamId, timeoutMs = 10000, after },
   const signature = current => digest({ instanceId: gateway.entry.instanceId,
     taskState: current.status.taskState, runtimeState: current.status.runtimeState, rootTurnState: current.status.rootTurnState,
     completed: current.result.completed, activity: current.status.teamActivity,
+    execution: current.result.execution ? { ownedJobsSettled: current.result.execution.ownedJobsSettled, jobs: current.result.execution.jobs } : null,
     cursors: [...cursors].sort(), states: [...states].sort(), attempts: [...attempts].sort(),
     pending: gateway.interactions.pending(teamId).map(p => [p.interactionId, p.deliveryId, p.requiresUser]),
   });
