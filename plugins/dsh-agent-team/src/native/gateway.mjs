@@ -131,6 +131,9 @@ export class GatewayClient {
     if (method === 'input' && !this.lastHealth.api.capabilities.includes('input-observations')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support input evidence. A compatible released host is required; no status fallback or resend was attempted.');
     }
+    if (method === 'jobs' && !this.lastHealth.api.capabilities.includes('owned-job-observations')) {
+      throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support scoped Job observations. No unscoped query or cold activation was attempted.');
+    }
     if (method === 'withdrawInput' && !this.lastHealth.api.capabilities.includes('live-input-withdrawal')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support live input withdrawal. No queue mutation, cold resume or fallback was attempted.');
     }

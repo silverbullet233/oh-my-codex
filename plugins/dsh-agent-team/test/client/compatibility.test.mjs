@@ -46,6 +46,24 @@ test('input evidence requires an additive capability without reading status or r
   await assert.rejects(client.request('input', { teamId: 'lead', inputId: 'input-1' }), { code: 'CAPABILITY_MISMATCH' });
   assert.deepEqual(calls.map(call => call.method), ['health']);
 });
+test('owned Job reads require capability without unscoped fallback', async t => {
+  const { client, calls } = await fixture(t);
+  await assert.rejects(client.request('jobs', { teamId: 'lead' }), { code: 'CAPABILITY_MISMATCH' });
+  assert.deepEqual(calls.map(call => call.method), ['health']);
+});
+test('MCP maps bounded Team Job queries and refuses raw owner/output controls', async t => {
+  const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'owned-job-observations'] } });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const params = { teamId: 'lead', limit: 3 };
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_jobs', arguments: params } });
+  assert.equal(response.result.structuredContent.accepted, true); assert.deepEqual(calls.at(-1), { method: 'jobs', params });
+  const before = calls.length;
+  for (const arguments_ of [{ ...params, owner: 'foreign' }, { ...params, consume: true }, { ...params, limit: 26 }, { ...params, limit: 0 }]) {
+    assert.equal((await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_jobs', arguments: arguments_ } })).error.code, -32602);
+  }
+  assert.equal(calls.length, before);
+});
 test('withdrawal refuses unsupported hosts before mutation or resume', async t => {
   const { client, calls } = await fixture(t);
   await assert.rejects(client.request('withdrawInput', { teamId: 'lead', inputId: 'input-1', expectedMessageId: 'message-1' }), { code: 'CAPABILITY_MISMATCH' });

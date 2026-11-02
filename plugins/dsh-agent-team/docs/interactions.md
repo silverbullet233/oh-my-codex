@@ -27,6 +27,12 @@ With `live-input-withdrawal`, explicitly withdraw a no-longer-wanted pending inp
 
 Native removal and private receipt storage are not one transaction. `WITHDRAWAL_UNCERTAIN` preserves the intent, blocks resending and never infers success from absence. An explicit identical retry can act only on the same still-pending message. Preserve IDs/Home for investigation if uncertainty remains; do not resume cold work or clear queues to bypass it. This capability is unreleased and absent from host 0.6.0; exact installation pins remain unchanged.
 
+## Owned Job observations (development)
+
+With `owned-job-observations`, `dsh_team_jobs` reads metadata for the managed root and its declared native roster owners. Unowned Jobs visible in the native registry and unrelated Team owners are excluded. Counts cover observed records; samples prioritize running/stopping work, default to 20 and cap at 25 with explicit omissions. Optional progress previews cap at 160 UTF-8 bytes. Commands, full output, terminal details and spill paths are omitted; byte positions do not prove a business result. No model output cursor is consumed and no execution/control operation is exposed.
+
+`rootAsOfSeq` scopes the roster read; its identity/sequence follow-up check is not an atomic Team/Job snapshot. Unavailable counts remain null. The process-local registry drops records, so empty/cold results are not historical completeness, stopped execution, resource-release or goal-acceptance evidence. Cold reads never activate work. Ask Lead for any Job control or underlying evidence. This capability is unreleased and absent from host 0.6.0; installation pins stay unchanged.
+
 ## Approval boundary
 
 `kind: "approval"` covers native approvals and permission-shaped question intents. The answer tool refuses both. Use `dsh_team_approval` to `deny`, or to `approve` with `authorization` quoting the user's explicit permission for that exact action. Never invent authorization, infer it from a task report, grant blanket permission or choose `always`. Missing authorization never grants access.
