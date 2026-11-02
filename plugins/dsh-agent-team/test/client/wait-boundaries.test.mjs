@@ -20,7 +20,7 @@ function observation() {
         return { teamId, sessionId: teamId, team: { members: state.roster.map(id => ({ id })) } };
       },
       async *stream(method, request, signal) {
-        const id = request.address?.sessionId ?? request.sessionId, key = `${id}:${method}`, channel = new Channel();
+        const id = request.address?.childSessionId ?? request.address?.sessionId ?? request.sessionId, key = `${id}:${method}`, channel = new Channel();
         opened.add(id); streams.set(key, channel);
         try {
           yield method === 'follow' ? { type: 'snapshot', header: { id }, cursor: 0 } : { cursor: 0, active: true, running: state.running, queue: [] };
