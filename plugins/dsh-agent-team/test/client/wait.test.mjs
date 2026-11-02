@@ -6,13 +6,17 @@ const drained = server => eventually(() => [...server.streams.values()].every(se
 test('wait retains owned Job settlement evidence and notices count changes before terminal completion', { timeout: 10000 }, async t => {
   const { client, server, state } = await interactionFixture(t);
   state.execution = { nativeTeamCompleted: true, ownedJobsSettled: false, jobs: { available: true, counts: { running: 1, stopping: 0 } } };
-  const first = await client.request('wait', { teamId: 'lead', timeoutMs: 50 });
-  assert.equal(first.reason, 'timeout'); assert.equal(first.result.execution.ownedJobsSettled, false); await drained(server);
+  const controller = new AbortController();
+  const observing = client.request('wait', { teamId: 'lead', timeoutMs: 5000 }, { signal: controller.signal });
+  await opened(server); await eventually(() => state.reads >= 2);
+  controller.abort();
+  const first = await observing;
+  assert.equal(first.reason, 'cancelled'); assert(first.baseline); assert.equal(first.result.execution.ownedJobsSettled, false); await drained(server);
   state.execution.jobs.counts = { running: 0, stopping: 1 };
-  const stopping = await client.request('wait', { teamId: 'lead', timeoutMs: 50, after: first.baseline });
+  const stopping = await client.request('wait', { teamId: 'lead', timeoutMs: 5000, after: first.baseline });
   assert.equal(stopping.reason, 'changed'); assert.equal(stopping.result.completed, false); await drained(server);
   state.completed = true; state.execution.ownedJobsSettled = true; state.execution.jobs.counts = { running: 0, stopping: 0 };
-  assert.equal((await client.request('wait', { teamId: 'lead', timeoutMs: 50, after: stopping.baseline })).reason, 'completed'); await drained(server);
+  assert.equal((await client.request('wait', { teamId: 'lead', timeoutMs: 5000, after: stopping.baseline })).reason, 'completed'); await drained(server);
 });
 test('wait observes cold native subagents through their durable parent address', { timeout: 10000 }, async t => {
   const { client, server } = await interactionFixture(t);
