@@ -56,6 +56,21 @@ function execution(value) {
       counts: value.jobs?.counts ? Object.fromEntries(['running', 'stopping', 'completed', 'killed', 'failed'].map(key => [key, integer(value.jobs.counts[key])])) : null } };
 }
 
+function toolActivity(value) {
+  if (value?.format !== 'native-tool-receipts-v1' || !Array.isArray(value.sessions)) return { available: false, reason: 'not-provided-or-unsupported-format' };
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const receipt = row => row ? { callId: id(row.callId), name: id(row.name), step: count(row.step), callSeq: count(row.callSeq),
+    ...(row.resultSeq === undefined ? {} : { resultSeq: count(row.resultSeq), isError: boolean(row.isError) }) } : null;
+  return { available: true, format: value.format, atomic: false, historyScope: 'latest-started-turn',
+    sessions: value.sessions.slice(0, 4).map(row => {
+      const calls = list(row.unsettled), omitted = count(row.omittedSamples);
+      return { sessionId: id(row.sessionId), asOfSeq: count(row.asOfSeq), unchangedAtCheck: boolean(row.unchangedAtCheck), available: boolean(row.available), reason: id(row.reason),
+        turn: count(row.turn), turnOpen: boolean(row.turnOpen), observedCalls: count(row.observedCalls), observedResults: count(row.observedResults),
+        correlationComplete: boolean(row.correlationComplete), omittedCallEvents: count(row.omittedCallEvents), unsettledCount: count(row.unsettledCount), unsettledKnownCount: count(row.unsettledKnownCount),
+        unsettled: (calls ?? []).slice(0, 2).map(receipt), omittedSamples: calls === null || omitted === null ? null : omitted + Math.max(0, calls.length - 2), lastResult: receipt(row.lastResult) };
+    }), omittedSessions: count(value.omittedSessions) === null ? null : value.omittedSessions + Math.max(0, value.sessions.length - 4) };
+}
+
 export function boundedObservation(method, value, request = {}) {
   const status = method === 'wait' ? value?.status : method === 'status' ? value : null;
   const result = method === 'wait' ? value?.result : method === 'result' ? value : null;
@@ -74,6 +89,7 @@ export function boundedObservation(method, value, request = {}) {
       rootTurnCompleted: boolean(source?.rootTurnCompleted), completed: boolean(method === 'status' ? status?.teamCompleted : result?.completed), goalAccepted: null, pendingTasks: integer(source?.teamActivity?.pendingTasks) },
     completionScope: method === 'status' ? 'native-team-only' : result?.execution ? 'native-team-and-observed-owned-jobs' : 'legacy-native-result',
     execution: execution(result?.execution),
+    toolActivity: toolActivity(source?.toolActivity),
     sourceCuts: { status: cut(status), result: cut(result) }, turns: turns(result?.turns ?? (observation ? { latestStarted: { turn: observation.turn, startSeq: observation.turnStartSeq }, active: observation.open === true ? observation.turn : null, lastEnded: observation.lastEnd, lastCompleted: observation.lastCompletedTurn } : null)),
     output: { ...preview(text, 2048), source: outputSource ? { turn: integer(outputSource.turn), seq: integer(outputSource.seq), truncated: boolean(outputSource.truncated) } : null },
     latestAssistant: latestAssistant ? { turn: integer(latestAssistant.turn), seq: integer(latestAssistant.seq), hasText: boolean(latestAssistant.hasText) } : null,
@@ -90,6 +106,10 @@ export function boundedObservation(method, value, request = {}) {
     summary.reducedForBudget = true;
     summary.output = { ...summary.output, ...preview(text, 256) };
     summary.members.items = []; summary.members.omitted = members?.length ?? null;
+    if (summary.toolActivity.available) {
+      summary.toolActivity.omittedSessions = summary.toolActivity.omittedSessions === null ? null : summary.toolActivity.omittedSessions + summary.toolActivity.sessions.length;
+      summary.toolActivity.sessions = [];
+    }
     for (const [name, value] of Object.entries(summary.sourceCuts)) if (value) {
       const original = name === 'status' ? status : result;
       value.projections = []; value.omittedProjections = list(original?.freshness?.projections)?.length ?? null;
