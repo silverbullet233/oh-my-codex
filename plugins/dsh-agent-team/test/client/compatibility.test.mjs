@@ -46,6 +46,38 @@ test('input evidence requires an additive capability without reading status or r
   await assert.rejects(client.request('input', { teamId: 'lead', inputId: 'input-1' }), { code: 'CAPABILITY_MISMATCH' });
   assert.deepEqual(calls.map(call => call.method), ['health']);
 });
+test('withdrawal refuses unsupported hosts before mutation or resume', async t => {
+  const { client, calls } = await fixture(t);
+  await assert.rejects(client.request('withdrawInput', { teamId: 'lead', inputId: 'input-1', expectedMessageId: 'message-1' }), { code: 'CAPABILITY_MISMATCH' });
+  assert.deepEqual(calls.map(call => call.method), ['health']);
+});
+test('MCP withdrawal maps exact native IDs and refuses missing identity or extra targets', async t => {
+  const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'live-input-withdrawal'] } });
+  const dispatch = createDispatcher(client);
+  await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+  const params = { teamId: 'lead', inputId: 'input-1', expectedMessageId: 'message-1' };
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_withdraw_input', arguments: params } });
+  assert.equal(response.result.structuredContent.accepted, true);
+  assert.deepEqual(calls.at(-1), { method: 'withdrawInput', params });
+  const before = calls.length;
+  for (const arguments_ of [{ teamId: 'lead', inputId: 'input-1' }, { ...params, memberId: 'bypass' }, { ...params, expectedMessageId: '' }]) {
+    assert.equal((await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_withdraw_input', arguments: arguments_ } })).error.code, -32602);
+  }
+  assert.equal(calls.length, before);
+});
+test('lost withdrawal reply is uncertain and never replays the mutation', { timeout: 15000 }, async t => {
+  const owned = await ownedFixture(t);
+  let admitted = 0, response;
+  const server = await serveNativeFixture({ health: { ...contract, capabilities: [...contract.capabilities, 'live-input-withdrawal'] }, dispatch: async method => {
+    if (method === 'withdrawInput') { admitted++; response.destroy(); return { state: 'withdrawn' }; }
+    return {};
+  } });
+  server.ctx.on('connection/request', (request, current, next) => { if (request.url === '/api/roleTeams/withdrawInput') response = current; return next(); });
+  const client = new GatewayClient({ runtime: await loadRuntime(owned.runtime), entry: { url: server.url, pid: process.pid, instanceId: null } });
+  t.after(async () => { await client.close(); await server.close(); });
+  await assert.rejects(client.request('withdrawInput', { teamId: 'lead', inputId: 'input-1', expectedMessageId: 'message-1' }), { code: 'OUTCOME_UNCERTAIN' });
+  assert.equal(admitted, 1);
+});
 test('MCP input query preserves root/input identity and refuses extra targets before transport', async t => {
   const { client, calls } = await fixture(t, { health: { ...contract, capabilities: [...contract.capabilities, 'input-observations'] } });
   const dispatch = createDispatcher(client);

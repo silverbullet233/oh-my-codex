@@ -53,6 +53,8 @@ When health advertises `ended-turn-results`, use `dsh_team_turn_result` to retai
 
 When health advertises `input-observations`, use `dsh_team_input` with the original root/input IDs to distinguish saved admission from native pending, entered-turn or turn-ended evidence. Cold reads stay passive. Absence is inconclusive because history is bounded; do not automatically resend or claim withdrawal/implementation from these observations. This development query requires a compatible future host, not the published 0.6.0 archive.
 
+When a known pending input is explicitly no longer wanted and health advertises `live-input-withdrawal`, inspect input evidence then use `dsh_team_withdraw_input` with its exact native message ID. Only a still-live, uniquely matching pending message can be removed. This does not stop running work, undo files or resume cold execution. Preserve uncertain receipts/IDs, never infer withdrawal from absence or resurrect an old input ID, and use a new ID only for explicitly authorized new work. See [withdrawal details](../../docs/interactions.md#live-input-withdrawal-development).
+
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
 ## Lead questions and approvals

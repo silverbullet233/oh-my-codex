@@ -15,8 +15,8 @@ test('MCP exposes fourteen explicit Session operations and requires initializati
   const dispatch = createDispatcher({ request: async () => ({}) });
   assert.equal((await dispatch(rpc('tools/list'))).error.code, -32002);
   await dispatch(rpc('initialize', {}));
-  assert.deepEqual((await dispatch(rpc('tools/list'))).result.tools.map((item) => item.name), ['dsh_team_web', 'dsh_team_shutdown', 'dsh_team_health', 'dsh_team_create', 'dsh_team_send', 'dsh_team_status', 'dsh_team_input', 'dsh_team_result', 'dsh_team_turn_result', 'dsh_team_stop', 'dsh_team_pending', 'dsh_team_answer', 'dsh_team_escalate', 'dsh_team_approval', 'dsh_team_wait']);
-  assert.equal(tools.length, 15);
+  assert.deepEqual((await dispatch(rpc('tools/list'))).result.tools.map((item) => item.name), ['dsh_team_web', 'dsh_team_shutdown', 'dsh_team_health', 'dsh_team_create', 'dsh_team_send', 'dsh_team_status', 'dsh_team_input', 'dsh_team_withdraw_input', 'dsh_team_result', 'dsh_team_turn_result', 'dsh_team_stop', 'dsh_team_pending', 'dsh_team_answer', 'dsh_team_escalate', 'dsh_team_approval', 'dsh_team_wait']);
+  assert.equal(tools.length, 16);
   assert.equal(await dispatch({ jsonrpc: '2.0', method: 'notifications/initialized' }), undefined);
 });
 

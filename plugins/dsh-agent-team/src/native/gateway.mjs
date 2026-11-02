@@ -6,7 +6,7 @@ import { InteractionQueue, untilAbort, aborted } from './interactions.mjs';
 import { NativeObservation, nativeValue } from './observation.mjs';
 import { waitForTeam } from './wait.mjs';
 const required = ['native-session', 'durable-role-snapshots', 'native-role-settings', 'text-input', 'idempotent-admission', 'host-activity'];
-const writes = new Set(['create', 'send', 'stop', 'prepareShutdown']);
+const writes = new Set(['create', 'send', 'stop', 'prepareShutdown', 'withdrawInput']);
 export function verifyHealth(value, entry) {
   if (value?.ok !== true || value.api?.name !== 'dsh-team-roles' || value.api.version !== 1
     || required.some(name => !value.api.capabilities?.includes(name)) || value.runtime?.packageVersion !== '0.2.2-alpha.2') throw new ClientError('CAPABILITY_MISMATCH', 'The owned host requires dsh-team-roles native API 1 and the exact supported runtime. No work was submitted.');
@@ -130,6 +130,9 @@ export class GatewayClient {
     }
     if (method === 'input' && !this.lastHealth.api.capabilities.includes('input-observations')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support input evidence. A compatible released host is required; no status fallback or resend was attempted.');
+    }
+    if (method === 'withdrawInput' && !this.lastHealth.api.capabilities.includes('live-input-withdrawal')) {
+      throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support live input withdrawal. No queue mutation, cold resume or fallback was attempted.');
     }
     if (method === 'stop') this.wake();
     try {

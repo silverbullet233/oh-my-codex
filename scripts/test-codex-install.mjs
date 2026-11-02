@@ -78,7 +78,7 @@ try {
     const messages = [{ jsonrpc: '2.0', id: 1, method: 'initialize' }, { jsonrpc: '2.0', id: 2, method: 'tools/list' }].map(row => JSON.stringify(row)).join('\n') + '\n';
     const smoke = spawnSync(mcp.command, mcp.args.map(expand), { cwd: directory, env: { PATH: process.env.PATH }, input: messages, encoding: 'utf8', timeout: 10_000 });
     assert.equal(smoke.status, 0, smoke.stderr);
-    assert.equal(JSON.parse(smoke.stdout.trim().split('\n')[1]).result.tools.length, 15);
+    assert.equal(JSON.parse(smoke.stdout.trim().split('\n')[1]).result.tools.length, 16);
     observed.push({ ...snapshot, mcpTools: JSON.parse(smoke.stdout.trim().split('\n')[1]).result.tools.length });
   }
   cli(['remove', 'dsh-agent-team@oh-my-codex']);
