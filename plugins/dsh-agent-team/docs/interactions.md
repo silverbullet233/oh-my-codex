@@ -15,6 +15,12 @@ The path remains `User <-> Codex main <-> DSH Lead <-> members`. Main handles re
 {"teamId":"<Lead root>","interactionId":"<pending ID>","deliveryId":"<current delivery>","source":"main","answers":[{"id":"scope","selected":["existing"]}]}
 ```
 
+## Input evidence (development)
+
+When health advertises `input-observations`, query `dsh_team_input` with the exact managed-root `teamId` and create/send `inputId` after an uncertain outcome. Saved admission is `acknowledged` or `unconfirmed`, separately from native evidence at one root sequence cut: `pending` returns native message IDs/placements, `entered-turn` identifies consumption, and `turn-ended` retains the outcome. Ending a turn does not prove implementation or goal acceptance. Unknown admission IDs are rejected; cold reads never activate execution.
+
+Entered-input observations retain at most 4096 entries. `not-observed`, ambiguity and unavailable evidence do not prove rejection, absence or withdrawal. Never automatically resend uncertain work based on missing evidence. This query does not cancel or supersede a queued input. The capability is unreleased and absent from published host 0.6.0; preserve installation pins until a compatible version is published.
+
 ## Approval boundary
 
 `kind: "approval"` covers native approvals and permission-shaped question intents. The answer tool refuses both. Use `dsh_team_approval` to `deny`, or to `approve` with `authorization` quoting the user's explicit permission for that exact action. Never invent authorization, infer it from a task report, grant blanket permission or choose `always`. Missing authorization never grants access.

@@ -40,6 +40,7 @@ test('exact create binds its native Team only after the reply and permits identi
   assert.equal((await client.request('create', { ...create })).teamId, nativeTeam);
   await client.request('result', { teamId: nativeTeam });
   await assert.rejects(client.request('turnResult', { teamId: nativeTeam, turn: 1 }), /outside the authorized exact request policy/);
+  await assert.rejects(client.request('input', { teamId: nativeTeam, inputId: 'unapproved-read' }), /outside the authorized exact request policy/);
   await client.request('create', { ...create });
   assert.deepEqual(calls, [{ method: 'create', params: create }, { method: 'result', params: { teamId: nativeTeam } }, { method: 'create', params: create }]);
 });
