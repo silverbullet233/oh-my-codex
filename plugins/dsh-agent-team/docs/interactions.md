@@ -57,6 +57,16 @@ Wait consumes passive native `session.follow` and `observeState` streams for roo
 
 While Codex controls a Team, native Web observation/settings are supported. Sending Web messages or answering forwarded prompts/approvals there is unsupported concurrent interaction. No exclusive-client ownership or Web/Codex arbitration is implemented. Unexpected native settlement still cancels local deliveries and invalidates stale answers; user UI access remains unchanged.
 
+## Tool-call receipts (development)
+
+Compatible future hosts advertise `tool-call-observations` and add `toolActivity` to existing status/result responses, including wait observations. Published host 0.6.0 lacks this addition; version/checksum pins are unchanged. No new MCP tool or native request argument is required. The client recognizes `native-tool-receipts-v1`; missing or unsupported metadata is unavailable rather than a zero count, and existing host requests remain compatible.
+
+These are public native `tool/call` requests and `tool/result` receipts for the latest-started turn, not runtime execution phases. They contain bounded call/tool IDs, step/sequence identities, observed counts and the latest result's native error flag, never arguments, commands, output, reasoning or credentials. An unsettled call only lacks a correlated committed result at that cut; it may be requested, interrupted or already terminal without a matching receipt. Read `turnOpen`, source cut and freshness. Counts and error flags do not imply goal acceptance.
+
+Host samples at most 32 root/declared-roster Sessions and four unsettled calls per Session; the native projection tracks at most 16 unsettled identities per Session. Overflow, ambiguous/invalid IDs and unmatched results make correlation incomplete and unsettled total unknown; omitted call events and sample omissions remain explicit. New turns reset receipts; cold reads refold through native projections without activating Agents. Per-Session cuts are not an atomic Team snapshot or complete task history.
+
+MCP summary samples at most four Sessions/two unsettled calls each; the existing total 16384-byte tool-body budget can omit all tool samples explicitly. Full responses retain the host view. Observation never controls tools/members, infers a waiting reason or replaces separate Job/stop/completion evidence.
+
 ## Historical ended-turn reads (development)
 
 `dsh_team_turn_result` requires the additive host capability `ended-turn-results`, absent from the published host 0.6.0. The release pins remain unchanged; this development feature requires a future published compatible host. An unsupported host returns `CAPABILITY_MISMATCH`; do not substitute `dsh_team_result` and pretend it is historical data.

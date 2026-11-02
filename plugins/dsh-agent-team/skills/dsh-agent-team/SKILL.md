@@ -59,6 +59,8 @@ When a known pending input is explicitly no longer wanted and health advertises 
 
 When supported by `owned-job-observations`, use `dsh_team_jobs` for bounded read-only progress of declared Team-owned Jobs, including member-owned Jobs, without consuming model output. Unowned visibility is not ownership. Inspect omissions, scope freshness and unavailable counts; process-local empty results do not prove historical completeness, stopped work, resource release or goal success. Send any execution/control request only through Lead. See [Job observation details](../../docs/interactions.md#owned-job-observations-development).
 
+When `tool-call-observations` is advertised, status/result/wait summaries can show tool request/result receipts even with empty text and no Job. Inspect each Session's turn/cut, unknown correlation and omissions. An unsettled receipt is not proof that a tool started, remains running or is waiting for a particular reason; a result is not business acceptance. Missing/older-host metadata stays unavailable. Do not fetch arguments/output or send member instructions to fill the gap. See [tool receipt details](../../docs/interactions.md#tool-call-receipts-development).
+
 If Lead cannot proceed, preserve task identity, collect the exact blocker and admission/outcome evidence, and escalate to the user for a decision. Do not silently take over implementation or route work around Lead. Existing authority covers routine authorized corrections; ask only for genuinely missing decisions or access.
 
 ## Lead questions and approvals
