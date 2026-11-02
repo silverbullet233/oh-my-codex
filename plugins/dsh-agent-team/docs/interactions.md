@@ -21,6 +21,12 @@ When health advertises `input-observations`, query `dsh_team_input` with the exa
 
 Entered-input observations retain at most 4096 entries. `not-observed`, ambiguity and unavailable evidence do not prove rejection, absence or withdrawal. Never automatically resend uncertain work based on missing evidence. This query does not cancel or supersede a queued input. The capability is unreleased and absent from published host 0.6.0; preserve installation pins until a compatible version is published.
 
+## Live input withdrawal (development)
+
+With `live-input-withdrawal`, explicitly withdraw a no-longer-wanted pending input using `dsh_team_withdraw_input` and its exact `teamId`, `inputId` and `expectedMessageId` from input evidence. Only the existing live Lead is eligible; cold, claimed, changed or ambiguous state is refused. A successful durable `state: withdrawn` receipt is historical evidence and can be retried identically after reconnect; it cancels no running work and rolls back no files. The old input ID cannot be resubmitted. New work requires a new explicitly authorized input ID.
+
+Native removal and private receipt storage are not one transaction. `WITHDRAWAL_UNCERTAIN` preserves the intent, blocks resending and never infers success from absence. An explicit identical retry can act only on the same still-pending message. Preserve IDs/Home for investigation if uncertainty remains; do not resume cold work or clear queues to bypass it. This capability is unreleased and absent from host 0.6.0; exact installation pins remain unchanged.
+
 ## Approval boundary
 
 `kind: "approval"` covers native approvals and permission-shaped question intents. The answer tool refuses both. Use `dsh_team_approval` to `deny`, or to `approve` with `authorization` quoting the user's explicit permission for that exact action. Never invent authorization, infer it from a task report, grant blanket permission or choose `always`. Missing authorization never grants access.
