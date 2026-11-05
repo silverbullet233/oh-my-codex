@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { OwnedHost } from '../../src/host/manager.mjs';
+import { initializeOwnedHome, OwnedHost } from '../../src/host/manager.mjs';
+import { writePrivate } from '../../src/host/files.mjs';
 import { loadRuntime } from '../../src/native/runtime.mjs';
 import { WEB_URL_ACKNOWLEDGEMENT, authenticatedHostEntry, managedRootTeam } from '../../src/host/web-url.mjs';
 import { ownedFixture } from '../fixtures/owned.mjs';
@@ -16,23 +18,54 @@ const statusFor = (teamId) => ({
   runtimeState: 'idle',
   taskState: 'completed',
 });
-const secretToken = (url) => new URL(url).searchParams.get('token');
+const tokenOf = (url) => new URL(url).searchParams.get('token');
+const PID = process.pid;
 
-async function syntheticHost(t, dispatchStatus = async (_method, params) => statusFor(params.teamId)) {
-  const owned = await ownedFixture(t);
+/** Isolated owned home + synthetic authenticated native fixture; process birth is injected deterministically. */
+async function syntheticHost(t, { dispatchStatus } = {}) {
+  const base = await ownedFixture(t);
+  const runtime = await loadRuntime(base.runtime);
+  const home = await mkdtemp(join(tmpdir(), 'web-url-revalidate-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  await initializeOwnedHome(home, home);
+  const realHome = await realpath(home);
+  const directory = join(realHome, '.codex-owned'); await mkdir(directory, { recursive: true, mode: 0o700 });
+  // The synthetic official-Connection fixture reports the real running pid and this environment's
+  // DSH_HOME/DSH_OWNED_INSTANCE_ID. Point them at the isolated owned home so the native health
+  // handshake attributes the fixture exactly like the revalidated instance record.
+  const priorHome = process.env.DSH_HOME, priorInstance = process.env.DSH_OWNED_INSTANCE_ID;
+  process.env.DSH_HOME = realHome; process.env.DSH_OWNED_INSTANCE_ID = 'synthetic-instance-1';
   const calls = [];
   const server = await serveNativeFixture({ health: contract, dispatch: async (method, params) => {
     calls.push({ method, params });
     if (method === 'health') return {};
-    if (method === 'status') return dispatchStatus(method, params);
+    if (method === 'status') return dispatchStatus ? dispatchStatus(method, params) : statusFor(params.teamId);
     throw new Error(`unexpected synthetic method: ${method}`);
   } });
-  t.after(() => server.close());
-  const runtime = await loadRuntime(owned.runtime);
-  // Synthetic attributed entry for the fixture host: pid/instanceId are those the fixture reports.
-  const entry = { version: 1, birthFormat: 'utc-c-v1', instanceId: null, url: server.url, pid: process.pid, birth: 'synthetic-birth', supervisorPid: process.pid, supervisorBirth: 'synthetic-birth' };
-  const live = () => { owned.owner.runtime = runtime; owned.owner.entry = entry; return owned.owner; };
-  return { owned, calls, server, runtime, entry, live, origin: new URL(server.url).origin };
+  const connects = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(input, 'http://fixture.invalid');
+    if (url.pathname === '/connect') connects.push(url.searchParams.get('interactions'));
+    return originalFetch(input, init);
+  };
+  t.after(async () => {
+    globalThis.fetch = originalFetch;
+    await server.close();
+    if (priorHome === undefined) delete process.env.DSH_HOME; else process.env.DSH_HOME = priorHome;
+    if (priorInstance === undefined) delete process.env.DSH_OWNED_INSTANCE_ID; else process.env.DSH_OWNED_INSTANCE_ID = priorInstance;
+  });
+  const births = new Map();
+  const config = { home: realHome, runtimeAnchor: base.runtime, profile: 'web', startupTimeoutMs: 5000, _birth: pid => births.get(pid) ?? 'no-such-process' };
+  const owner = new OwnedHost(config);
+  const record = {
+    version: 1, birthFormat: 'utc-c-v1', instanceId: 'synthetic-instance-1', pid: process.pid, birth: 'synthetic-birth-1',
+    supervisorPid: process.pid + 1, supervisorBirth: 'synthetic-supervisor-birth', url: server.url,
+    home: realHome, runtimeAnchor: runtime.anchor,
+  };
+  const writeRecord = async (value = record) => { await writePrivate(join(directory, 'instance.json'), value); if (value.birth) births.set(value.pid, value.birth); };
+  const live = async () => { await writeRecord(); return { owner, record }; };
+  return { base, runtime, server, calls, connects, home: realHome, directory, config, owner, record, births, writeRecord, live, origin: new URL(server.url).origin };
 }
 
 test('authenticated entry validation accepts only the supported loopback homepage URL and never echoes the token', () => {
@@ -78,15 +111,22 @@ test('managed root validation accepts the root Session only and rejects member, 
   }
 });
 
-test('web URL query returns the existing authenticated URL verbatim with honest disclosure and no side effects', async t => {
+test('web URL query revalidates attribution on every disclosure and returns the verbatim URL without side effects', async t => {
   const host = await syntheticHost(t);
-  const owner = host.live();
-  const result = await owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT });
+  await host.live();
+  const before = (await readdir(host.directory)).sort();
+  const instanceBefore = await readFile(join(host.directory, 'instance.json'), 'utf8');
+  const assertNoStart = async () => {
+    assert.equal(host.owner.starting, undefined);
+    await assert.rejects(access(join(host.home, 'starts')), { code: 'ENOENT' });
+  };
+
+  const result = await host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT });
   assert.equal(result.teamId, 'managed-root');
   assert.equal(result.scope, 'host');
   assert.equal(result.origin, host.origin);
   assert(new URL(result.url).origin === host.origin, 'disclosed URL must stay on the owned loopback origin');
-  assert(secretToken(result.url) === secretToken(host.server.url) && secretToken(result.url), 'disclosed URL must be the exact host entry URL');
+  assert(tokenOf(result.url) === tokenOf(host.server.url) && tokenOf(result.url), 'disclosed URL must be the exact attributed entry URL');
   assert.deepEqual(result.disclosure, {
     bearerCredential: true,
     mayAppearInClientHistory: true,
@@ -105,49 +145,105 @@ test('web URL query returns the existing authenticated URL verbatim with honest 
     scopeNote: 'Owned-host homepage root. Upstream 0.2.2-alpha.3 exposes no Team or Session permalink; selecting a Team in Web remains in-app client state.',
   });
   assert.deepEqual(host.calls.map(call => call.method), ['health', 'status']);
-  assert.equal(host.calls.filter(call => call.method === 'status').length, 1);
-  assert.equal(JSON.stringify(host.calls).includes(secretToken(host.server.url)), false, 'native calls must not carry the launch token in their payloads');
-  // The query never starts the host, opens a browser or creates owned state directories.
-  assert.equal(owner.starting, undefined);
-  await assert.rejects(access(join(host.owned.home, '.codex-owned')), { code: 'ENOENT' });
+  assert.equal(JSON.stringify(host.calls).includes(tokenOf(host.server.url)), false, 'native calls must not carry the launch token in their payloads');
+  assert.deepEqual(host.connects, ['none'], 'the disclosure connection must be passive (interactions=none)');
+  assert.deepEqual((await readdir(host.directory)).sort(), before, 'the query must not create or remove owned state files');
+  assert.equal(await readFile(join(host.directory, 'instance.json'), 'utf8'), instanceBefore, 'the attributed record must stay unchanged');
+  await assertNoStart();
+
+  // A matching cached foreground entry is accepted only after the same revalidation.
+  host.owner.entry = { ...host.record };
+  const cached = await host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT });
+  assert(tokenOf(cached.url) === tokenOf(host.server.url));
+  assert.deepEqual(host.connects, ['none', 'none']);
+  await assertNoStart();
+});
+
+test('web URL query refuses stopped, replaced and PID-reused hosts without disclosing or starting anything', async t => {
+  const host = await syntheticHost(t);
+  const expectRefused = async (token) => {
+    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+      assert.equal(error.code, 'HOST_NOT_RUNNING');
+      if (token) assert(!error.message.includes(token), 'errors must not repeat the launch token');
+      return true;
+    });
+    assert.equal(host.owner.starting, undefined);
+    assert.equal(host.calls.length, 0, 'no native request may run for an unverified attribution');
+    assert.equal(host.connects.length, 0, 'no native connection may be opened for an unverified attribution');
+    await assert.rejects(access(join(host.home, 'starts')), { code: 'ENOENT' });
+  };
+
+  // Stopped host: cached foreground entry but the instance record is gone.
+  await host.live();
+  host.owner.entry = { ...host.record };
+  await rm(join(host.directory, 'instance.json'));
+  await expectRefused(tokenOf(host.record.url));
+
+  // Replaced instance: the record has a new pid/instanceId/token while the foreground cache is old.
+  await host.writeRecord({ ...host.record, instanceId: 'synthetic-instance-2', pid: PID + 10, birth: 'synthetic-birth-2', url: 'http://127.0.0.1:1/?token=synthetic-replacement-token' });
+  host.owner.entry = { ...host.record };
+  await expectRefused(tokenOf(host.record.url));
+
+  // PID reused: same pid but a different process birth invalidates the old capability.
+  await host.writeRecord({ ...host.record, birth: 'synthetic-birth-3' });
+  host.owner.entry = { ...host.record };
+  await expectRefused(tokenOf(host.record.url));
+
+  // Stale record with no cached entry: current() attribution cleanup refuses and never discloses.
+  host.owner.entry = undefined;
+  host.births.set(PID, 'different-current-birth');
+  await writePrivate(join(host.directory, 'instance.json'), { ...host.record, birth: 'synthetic-birth-1' });
+  await expectRefused(tokenOf(host.server.url));
+  await assert.rejects(access(join(host.directory, 'instance.json')), { code: 'ENOENT' });
+});
+
+test('web URL query fails closed on foreign homes, changed runtime anchors and unowned homes', async t => {
+  const host = await syntheticHost(t);
+  const marker = join(host.home, '.codex-dsh-owner.json');
+  await host.live();
+
+  await writePrivate(join(host.directory, 'instance.json'), { ...host.record, home: '/synthetic/foreign/home' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'OWNERSHIP_MISMATCH' });
+  assert.equal(host.calls.length, 0);
+
+  await writePrivate(join(host.directory, 'instance.json'), { ...host.record, runtimeAnchor: '/synthetic/other/runtime/package.json' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'OWNERSHIP_MISMATCH' });
+  assert.equal(host.calls.length, 0);
+
+  await rm(marker);
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'SETUP_REQUIRED' });
+  assert.equal(host.calls.length, 0);
 });
 
 test('web URL query refuses member, unknown and foreign Team identities after authenticated host validation', async t => {
-  const host = await syntheticHost(t, async () => { const error = new Error('The role service did not create the requested Team.'); error.code = 'team-roles/UNKNOWN_TEAM'; throw error; });
-  const owner = host.live();
-  await assert.rejects(owner.webUrl({ teamId: 'synthetic-child', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'UNMANAGED_TEAM' && !error.message.includes(secretToken(host.server.url)));
+  const host = await syntheticHost(t, { dispatchStatus: async () => { const error = new Error('The role service did not create the requested Team.'); error.code = 'team-roles/UNKNOWN_TEAM'; throw error; } });
+  await host.live();
+  await assert.rejects(host.owner.webUrl({ teamId: 'synthetic-child', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'UNMANAGED_TEAM' && !error.message.includes(tokenOf(host.server.url)));
   assert.deepEqual(host.calls.map(call => call.method), ['health', 'status']);
-});
-
-test('web URL query never starts, adopts or restarts a missing owned host', async t => {
-  const host = await syntheticHost(t);
-  const fresh = new OwnedHost({ ...host.owned.config });
-  await assert.rejects(fresh.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'HOST_NOT_RUNNING' });
-  assert.equal(host.calls.length, 0, 'a missing owned host must not be contacted or started');
-  assert.equal(fresh.starting, undefined);
-  await assert.rejects(access(join(host.owned.home, '.codex-owned')), { code: 'ENOENT' });
-  assert.equal(fresh.runtime !== undefined, true, 'inspection may load the configured runtime but must not create host state');
+  assert.deepEqual(host.connects, ['none']);
 });
 
 test('web URL query fails closed on non-loopback entries and on an unreachable attributed host', async t => {
   const host = await syntheticHost(t);
-  const owner = host.live();
-  owner.entry = { ...host.entry, url: 'http://example.invalid:41234/?token=synthetic-only-token' };
-  await assert.rejects(owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'INVALID_HOST_ENTRY' && !error.message.includes('synthetic-only-token'));
-  assert.equal(host.calls.length, 0, 'an invalid entry must not be contacted');
+  await host.live();
+  await writePrivate(join(host.directory, 'instance.json'), { ...host.record, url: 'http://example.invalid:41234/?token=synthetic-only-token' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'INVALID_HOST_ENTRY' && !error.message.includes('synthetic-only-token'));
+  assert.equal(host.calls.length, 0);
+  assert.equal(host.connects.length, 0, 'an invalid entry must not be contacted');
 
   const unreachable = await syntheticHost(t);
-  const owner2 = unreachable.live();
+  await unreachable.live();
   await unreachable.server.close();
-  await assert.rejects(owner2.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'HOST_NOT_RUNNING');
+  await assert.rejects(unreachable.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'HOST_NOT_RUNNING' });
 });
 
 test('web URL query requires the schema-level user acknowledgement before any host access', async t => {
   const host = await syntheticHost(t);
-  const owner = host.live();
+  await host.live();
   for (const acknowledge of [undefined, true, 'yes', 'reveal']) {
-    await assert.rejects(owner.webUrl({ teamId: 'managed-root', acknowledge }), { code: 'ACKNOWLEDGEMENT_REQUIRED' });
+    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge }), { code: 'ACKNOWLEDGEMENT_REQUIRED' });
   }
-  await assert.rejects(owner.webUrl({ acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'UNMANAGED_TEAM' });
+  await assert.rejects(host.owner.webUrl({ acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'UNMANAGED_TEAM' });
   assert.equal(host.calls.length, 0);
+  assert.equal(host.connects.length, 0);
 });

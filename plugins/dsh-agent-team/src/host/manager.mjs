@@ -29,7 +29,12 @@ export async function initializeOwnedHome(home, cwd) {
 }
 /** One owned ordinary Web host, reused across disposable MCP connections. */
 export class OwnedHost {
-  constructor(config = configuration()) { this.config = config; }
+  constructor(config = configuration()) {
+    this.config = config;
+    // Isolated tests may inject a deterministic process-start verifier; production
+    // configuration(env) never sets this, so the real birth() guard is unchanged.
+    this.verifyBirth = config._birth ?? birth;
+  }
   /** Read-only owned-home validation: loads the runtime and marker but creates no directory. */
   async inspectOwned() {
     this.runtime ??= await loadRuntime(this.config.runtimeAnchor);
@@ -69,7 +74,7 @@ export class OwnedHost {
     const entry = await readPrivate(join(this.directory, 'instance.json'));
     if (!entry) return null;
     if (entry.version !== 1 || entry.birthFormat !== 'utc-c-v1' || !Number.isSafeInteger(entry.pid) || entry.pid <= 0 || typeof entry.birth !== 'string' || !entry.birth || entry.home !== this.config.home || entry.runtimeAnchor !== this.runtime.anchor || typeof entry.instanceId !== 'string') throw new ClientError('OWNERSHIP_MISMATCH', 'Owned host metadata does not match this runtime.');
-    if (birth(entry.pid) !== entry.birth) { await unlink(join(this.directory, 'instance.json')); return null; }
+    if (this.verifyBirth(entry.pid) !== entry.birth) { await unlink(join(this.directory, 'instance.json')); return null; }
     return entry;
   }
   /**
@@ -81,19 +86,24 @@ export class OwnedHost {
     aborted(options.signal);
     requireWebUrlAcknowledgement(params.acknowledge);
     if (typeof params.teamId !== 'string' || !params.teamId || params.teamId.length > 256) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url requires exactly one existing managed Lead/root Team ID. No URL was disclosed.');
-    let runtime = this.runtime;
-    let entry = this.entry;
-    if (!entry) {
-      await this.inspectOwned();
-      runtime = this.runtime;
-      entry = await this.current();
-      if (!entry) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not running. This query never starts, adopts or restarts one; start it explicitly with dsh_team_health first. No URL was disclosed.');
+    // Revalidate the owned home, private metadata, runtime identity and instance
+    // attribution on EVERY disclosure, including a cached foreground entry. The
+    // gateway health handshake and the Team status read are not substitutes for
+    // the local pid+birth attribution guard in current().
+    await this.inspectOwned();
+    const runtime = this.runtime;
+    const entry = await this.current();
+    if (!entry) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not running. This query never starts, adopts or restarts one; start it explicitly with dsh_team_health first. No URL was disclosed.');
+    const cached = this.entry;
+    if (cached && (cached.instanceId !== entry.instanceId || cached.pid !== entry.pid || cached.birth !== entry.birth
+      || cached.home !== entry.home || cached.runtimeAnchor !== entry.runtimeAnchor || cached.url !== entry.url)) {
+      throw new ClientError('HOST_NOT_RUNNING', 'The cached owned-host entry no longer matches the attributed instance record; refresh with dsh_team_health before requesting the URL. No URL was disclosed.');
     }
-    if (entry.home !== undefined && this.config.home !== undefined && entry.home !== this.config.home) throw new ClientError('OWNERSHIP_MISMATCH', 'The owned host entry belongs to a different home; no URL was disclosed.');
-    if (runtime?.anchor && entry.runtimeAnchor !== undefined && entry.runtimeAnchor !== runtime.anchor) throw new ClientError('OWNERSHIP_MISMATCH', 'The owned host entry belongs to a different runtime; no URL was disclosed.');
     const { url, origin } = authenticatedHostEntry(entry);
-    let temporary;
-    const client = this.entry === entry && this.gateway ? this.gateway : (temporary = new GatewayClient({ runtime, entry }));
+    // A fresh passive connection (interactions=none) performs the one Team status
+    // read; it never claims, answers or cancels native interactions and is closed
+    // after use. No host is started, adopted, restarted or stopped.
+    const client = new GatewayClient({ runtime, entry, interactionMode: 'none' });
     let status;
     try {
       status = await client.request('status', { teamId: params.teamId }, options);
@@ -102,7 +112,7 @@ export class OwnedHost {
       if (error instanceof ClientError && ['AUTH_UNAVAILABLE', 'GATEWAY_UNAVAILABLE', 'INVALID_HOST_ENTRY'].includes(error.code)) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not reachable. This query never starts, adopts or restarts one; inspect it with dsh_team_health before retrying. No URL was disclosed.');
       throw error;
     } finally {
-      if (temporary) await temporary.close();
+      await client.close();
     }
     managedRootTeam(status, params.teamId);
     return { teamId: params.teamId, scope: WEB_URL_SCOPE, url, origin, disclosure: { ...WEB_URL_DISCLOSURE } };
