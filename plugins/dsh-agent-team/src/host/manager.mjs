@@ -10,7 +10,7 @@ import { ClientError } from '../native/errors.mjs';
 import { aborted } from '../native/interactions.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
-import { WEB_URL_ACKNOWLEDGEMENT, WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, requireWebUrlAcknowledgement } from './web-url.mjs';
+import { WEB_URL_ACKNOWLEDGEMENT, WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, requireWebUrlAcknowledgement, webUrlCancelled, webUrlCleanupError, webUrlError } from './web-url.mjs';
 export function configuration(env = process.env) {
   return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000 };
 }
@@ -83,7 +83,19 @@ export class OwnedHost {
    * existing managed Lead/root on this owned host; member, unknown and foreign IDs fail closed.
    */
   async webUrl(params = {}, options = {}) {
-    aborted(options.signal);
+    // Static sanitized boundary for EVERY exit of the public operation: metadata parsing,
+    // attribution, status/transport and cleanup failures can never surface arbitrary raw text
+    // (the private instance record is credential-bearing). Known safe guard codes keep static
+    // actionable mappings; everything else is a static generic failure.
+    try { return await this.queryWebUrl(params, options); }
+    catch (error) {
+      if (options.signal?.aborted) throw webUrlCancelled();
+      if (error instanceof ClientError && error.sanitized === true) throw error;
+      throw webUrlError(error);
+    }
+  }
+  async queryWebUrl(params = {}, options = {}) {
+    try { aborted(options.signal); } catch { throw webUrlCancelled(); }
     requireWebUrlAcknowledgement(params.acknowledge);
     if (typeof params.teamId !== 'string' || !params.teamId || params.teamId.length > 256) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url requires exactly one existing managed Lead/root Team ID. No URL was disclosed.');
     // Revalidate the owned home, private metadata, runtime identity and instance
@@ -104,17 +116,21 @@ export class OwnedHost {
     // read; it never claims, answers or cancels native interactions and is closed
     // after use. No host is started, adopted, restarted or stopped.
     const client = new GatewayClient({ runtime, entry, interactionMode: 'none' });
-    let status;
+    let status, primaryError, cleanupError;
     try {
       status = await client.request('status', { teamId: params.teamId }, options);
-    } catch (error) {
-      if (error instanceof ClientError && ['team-roles/UNKNOWN_TEAM', 'UNKNOWN_TEAM'].includes(error.code)) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url only accepts an existing managed Lead/root Team on this owned host. Member, unknown and foreign Team IDs are not query targets. No URL was disclosed.');
-      if (error instanceof ClientError && ['AUTH_UNAVAILABLE', 'GATEWAY_UNAVAILABLE', 'INVALID_HOST_ENTRY'].includes(error.code)) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not reachable. This query never starts, adopts or restarts one; inspect it with dsh_team_health before retrying. No URL was disclosed.');
-      throw error;
-    } finally {
-      await client.close();
+      managedRootTeam(status, params.teamId);
+    } catch (error) { primaryError = error; }
+    // Cleanup runs separately: a disposal failure must neither override an actionable
+    // primary error mapping nor be swallowed into a successful disclosure.
+    try { await client.close(); } catch (error) { cleanupError = error; }
+    if (primaryError) {
+      if (options.signal?.aborted) throw webUrlCancelled();
+      // Known safe failures are reconstructed with static token-free messages; any
+      // other status/transport error is replaced by a generic wrapper.
+      throw webUrlError(primaryError);
     }
-    managedRootTeam(status, params.teamId);
+    if (cleanupError) throw webUrlCleanupError();
     return { teamId: params.teamId, scope: WEB_URL_SCOPE, url, origin, disclosure: { ...WEB_URL_DISCLOSURE } };
   }
   async ensure() {
