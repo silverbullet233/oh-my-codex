@@ -4,30 +4,32 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Install the pinned Codex catalog
 
-Catalog **v0.3.0** contains plugin **dsh-agent-team 0.4.0**. These are independent versions.
+The unreleased candidate catalog **v0.3.1** contains plugin **dsh-agent-team 0.4.1**; it is not tagged or published. The latest **published** catalog is **v0.3.0** with plugin **dsh-agent-team 0.4.0**. These are independent versions.
 
-**Installation target:** v0.3.0 / plugin 0.4.0; use these pins only after that exact release is published and verified. The earlier catalog v0.2.1 / plugin 0.3.2 was published on 2026-10-31. The older v0.1.0 catalog uses the legacy client.
+**Installation target (unreleased candidate):** catalog v0.3.1 / plugin 0.4.1; publication pending — no tag or Release assets exist yet. The latest published installation remains catalog v0.3.0 / plugin 0.4.0; use the published `v0.3.0` tag for released installation until this candidate is tagged and its assets are verified. The earlier catalog v0.2.1 / plugin 0.3.2 was published on 2026-10-31. The older v0.1.0 catalog uses the legacy client.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 
-For the catalog's supplementary assets, an already authenticated GitHub CLI can download the fixed release with `gh release download v0.3.0 --repo silverbullet233/oh-my-codex --dir /absolute/new-empty-download-directory`; verify its `SHA256SUMS`. Git authentication and GitHub CLI authentication are separate prerequisites. The host archive below is public and uses its exact versioned URLs.
+**Unreleased candidate (catalog 0.3.1 / plugin 0.4.1, this branch):** the candidate is not tagged, has no Release assets and is not published; the `v0.3.1` pins below are release-preparation pins, not a published ref. It requires exact DSH `0.2.2-alpha.3` and the matching **unreleased** dsh-team-roles 0.6.1 candidate build (the published 0.6.0 archive supports only `0.2.2-alpha.2`), installed from a locally built plugin package in an isolated home; see the repository development instructions. The published install below remains on catalog v0.3.0 / plugin 0.4.0 and exact DSH `0.2.2-alpha.2`.
+
+For the published v0.3.0 catalog's supplementary assets, an already authenticated GitHub CLI can download that fixed release with `gh release download v0.3.0 --repo silverbullet233/oh-my-codex --dir /absolute/new-empty-download-directory`; verify its `SHA256SUMS`. Git authentication and GitHub CLI authentication are separate prerequisites. The host archive below is public and uses its exact versioned URLs.
 
 Use a Codex CLI that supports plugin marketplaces:
 
 ```sh
-codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.0
+codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.1
 codex plugin add dsh-agent-team@oh-my-codex --json
 ```
 
-The install result's `installedPath` is the plugin directory used below. Start a new Codex session after setup. Codex installs through the fixed Git marketplace tag, not directly from a Release tarball. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data. Do not register `main`, a feature branch or a floating latest ref for normal use.
+The install result's `installedPath` is the plugin directory used below. Start a new Codex session after setup. Codex installs through the fixed Git marketplace tag, not directly from a Release tarball. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data. Do not register `main`, a feature branch or a floating latest ref for normal use. The `v0.3.1` ref above is the candidate release-preparation pin; for released installation substitute the published `v0.3.0` tag until the candidate is tagged and verified.
 
 ## Agent-guided initialization
 
 Ask your AI Agent to follow [the bootstrap guide](bootstrap.md). It coordinates the existing explicit runtime/Home configuration, verified host download, setup and health checks; there is no separate bootstrap installer or automatic MCP discovery. The guide and setup repeat-safety changes are included from catalog v0.3.0. The equivalent manual steps are below.
 
-## Prepare the supported runtime and released host
+## Prepare the published runtime and released host
 
-Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone:
+Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone. The published plugin 0.4.0 requires exact `0.2.2-alpha.2`; the unreleased candidate requires `0.2.2-alpha.3` instead, as noted above:
 
 ```sh
 npm install --prefix /absolute/dsh-runtime @deepseek-ai/dsh@0.2.2-alpha.2 --ignore-scripts

@@ -1,6 +1,6 @@
 # Activated orchestration contract
 
-**Version scope:** this contract targets catalog **v0.3.0** / plugin **0.4.0**, with host **0.6.0** and exact runtime **0.2.2-alpha.2**. The earlier v0.2.1 / plugin 0.3.2 tag was published on 2026-10-31 and does not gain these additions.
+**Version scope:** the published contract targets catalog **v0.3.0** / plugin **0.4.0**, with host **0.6.0** and exact runtime **`0.2.2-alpha.2`**. The unreleased candidate on this branch targets catalog 0.3.1 / plugin 0.4.1 with exact runtime **`0.2.2-alpha.3`** and the matching unreleased dsh-team-roles 0.6.1 candidate; it is not tagged, has no Release assets and is not published. The earlier v0.2.1 / plugin 0.3.2 tag was published on 2026-10-31 and does not gain these additions.
 
 Activation is explicit: ask Codex to use DSH Agent Team for the work. Merely discussing/updating the plugin does not activate it, and other Codex workflows remain unchanged.
 
@@ -10,7 +10,7 @@ The communication path is `User <-> Codex main <-> DSH Lead <-> team members`.
 
 Codex main and DSH Lead must communicate in English, including task briefs, follow-up questions/instructions, review feedback, free-text answers and Lead replies. Main includes `Communicate with Codex main in English.` in initial briefs and follow-up instructions. Keep code, paths, symbols, exact IDs/option values and necessary original-language quotations unchanged. This language contract is behavioral guidance; the runtime does not detect or translate language.
 
-After each successful create, main presents `teamId` and `web.url`. `web.scope=host` identifies the owned-host homepage; it is not a Team-specific link. Native 0.2.2-alpha.2 persists Session selection in [workspace navigation state](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-alpha.2/packages/client/ui-workspace/src/client/navigation.ts), without a supported Session permalink. Find the returned root ID in Web. The URL contains no launch capability or cookies, and displaying it does not auto-open a browser. Authentication, when needed, uses the existing authorized `dsh_team_web` handoff.
+After each successful create, main presents `teamId` and `web.url`. `web.scope=host` identifies the owned-host homepage; it is not a Team-specific link. In the published scope, native `0.2.2-alpha.2` persists Session selection in [workspace navigation state](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.2-alpha.2/packages/client/ui-workspace/src/client/navigation.ts), without a supported Session permalink; the unreleased candidate uses the corresponding `dsh-v0.2.2-alpha.3` runtime behavior. Find the returned root ID in Web. The URL contains no launch capability or cookies, and displaying it does not auto-open a browser. Authentication, when needed, uses the existing authorized `dsh_team_web` handoff.
 
 | Owner | Responsibility |
 | --- | --- |

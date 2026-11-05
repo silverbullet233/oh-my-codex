@@ -8,7 +8,7 @@ export async function ownedFixture(t) {
   const builds = join(repo, '.test-output'); await mkdir(builds, { recursive: true });
   const runtime = await mkdtemp(join(builds, 'native-runtime-'));
   await mkdir(join(runtime, 'lib'));
-  await writeFile(join(runtime, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.2.2-alpha.2', type: 'module' }));
+  await writeFile(join(runtime, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.2.2-alpha.3', type: 'module' }));
   await writeFile(join(runtime, 'lib/bin.js'), `import ${JSON.stringify(new URL('./owned-cli.mjs', import.meta.url).href)};`);
   await initializeOwnedHome(home, home);
   const config = { home, runtimeAnchor: runtime, profile: 'web', startupTimeoutMs: 5000 };

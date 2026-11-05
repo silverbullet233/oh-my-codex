@@ -42,6 +42,7 @@ These operations were verified with Codex CLI 0.164.0. This optional check uses 
 - Bump the affected plugin version when its installed content changes. A catalog-only change can leave plugin versions unchanged. Codex 0.164.0 refreshed changed content under an unchanged plugin version in our fixture, but published versions should still identify immutable content.
 - Bump the catalog version for each catalog snapshot release. Use patch for compatible corrections, minor for compatible additions and major for breaking installation/catalog changes; during 0.x, document any breaking changes explicitly.
 - Add one `## X.Y.Z` entry to `CHANGELOG.md`. Tag, root version, lock and changelog must agree. Never move a published tag or replace an asset.
+- The current branch carries an **unreleased candidate** (catalog 0.3.1 / plugin 0.4.1, runtime DSH 0.2.2-alpha.3, requiring the matching unreleased dsh-team-roles 0.6.1 candidate). It is **not tagged, has no GitHub Release assets and is not published to npm**; the published installation pins remain catalog v0.3.0 / plugin 0.4.0 with DSH 0.2.2-alpha.2. Publication is a separate maintainer decision after the documented checks pass on the tagged default-branch commit and a compatible host release exists and is verified first.
 
 ## Prepare a release locally
 
@@ -52,7 +53,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 npm run build
 npm run pack:check
-npm run release:prepare -- --tag v0.3.0 --output ./dist/release-v0.3.0
+npm run release:prepare -- --tag v0.3.1 --output ./dist/release-v0.3.1
 ```
 
 The example pins the intended catalog version; verify its version mapping and release authorization before tagging. `release:prepare` only validates metadata and writes to an empty directory. It does not create a Git tag, contact GitHub or publish npm packages. It packs each npm-backed plugin offline with lifecycle scripts disabled. Manifest-only plugins remain available through the tagged catalog without an npm archive.
@@ -61,7 +62,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.4.0.tgz`.
+- Plugin tarballs, currently `dsh-agent-team-0.4.1.tgz` for the unreleased candidate.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.

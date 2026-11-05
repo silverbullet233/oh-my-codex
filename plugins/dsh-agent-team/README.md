@@ -2,9 +2,11 @@
 
 Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a **dedicated ordinary DSH Web host**, then connects through the official Node Connection/Typert Gateway. The native host owns role policy, immutable member snapshots, execution, persistence, tools and approvals. The client contains manifests, a skill, native API calls and process lifecycle management.
 
-Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
+Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and the published **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)** archive. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this published client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-These instructions target catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
+These instructions target the published catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
+
+**Unreleased candidate (catalog 0.3.1 / plugin 0.4.1, this branch):** moves the exact runtime pin to DSH `0.2.2-alpha.3` and requires the matching **unreleased** dsh-team-roles 0.6.1 candidate build; the published 0.6.0 archive supports only `0.2.2-alpha.2`. The candidate is not tagged, has no Release assets and is not published. Validate it only from a locally built plugin in an isolated home; do not claim a release URL, digest or tag for it.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 

@@ -24,10 +24,10 @@ const run = (command, args, cwd = root) => {
 };
 const pkg = join(root, 'fixture-package'); await mkdir(pkg);
 await copyFile(new URL('../test/fixtures/real-profile.mjs', import.meta.url), join(pkg, 'index.mjs'));
-await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: 'dsh-owned-test-fixture', version: '0.0.0', private: true, type: 'module', main: 'index.mjs', engines: { dsh: '0.2.2-alpha.2' }, dsh: { bundle: { patch: 'cordis.patch.yml' } } }));
+await writeFile(join(pkg, 'package.json'), JSON.stringify({ name: 'dsh-owned-test-fixture', version: '0.0.0', private: true, type: 'module', main: 'index.mjs', engines: { dsh: '0.2.2-alpha.3' }, dsh: { bundle: { patch: 'cordis.patch.yml' } } }));
 await writeFile(join(pkg, 'cordis.patch.yml'), JSON.stringify([{ id: 'credentials', disabled: true }, { insert: [{ id: 'keyless-credentials', name: 'dsh-owned-test-fixture' }] }]));
 const packed = JSON.parse(run('npm', ['pack', '--offline', '--ignore-scripts', '--cache', join(root, 'cache'), '--json', '--pack-destination', root], pkg))[0];
-for (const spec of ['@deepseek-ai/dsh-experimental-agent-team-profile@0.2.2-alpha.2', await realpath(hostTarball), join(root, packed.filename)]) run(process.execPath, [runtime.cli, 'plugin', '--profile', 'web', 'add', spec, '--ignore-scripts']);
+for (const spec of ['@deepseek-ai/dsh-experimental-agent-team-profile@0.2.2-alpha.3', await realpath(hostTarball), join(root, packed.filename)]) run(process.execPath, [runtime.cli, 'plugin', '--profile', 'web', 'add', spec, '--ignore-scripts']);
 const roles = ['lead', 'left', 'right'].map(name => ({ name, description: `Synthetic ${name} role`, instructions: `Use only synthetic ${name} task content and native Team coordination.`, provider: 'fixture-native', model: 'fixture-model' }));
 await writeFile(join(home, 'profiles/web/cordis.patch.yml'), JSON.stringify([{ id: 'session-title-llm', disabled: true }, { id: 'dsh-agent-team', config: { stateDirectory: join(home, 'role-state'), allowedRoots: [workspace], catalog: { leadRole: 'lead', roles } } }]));
 // Fail before any process starts if the test memory provider is not the effective composition.

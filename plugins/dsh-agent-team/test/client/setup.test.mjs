@@ -17,9 +17,9 @@ async function fixture(t) {
     calls.push({ command, args }); assert.equal(opts.env.DSH_HOME, await realpath(home));
     assert(args.includes('--ignore-scripts')); assert(args.includes('--save-exact')); assert(args.includes('--registry=https://registry.npmjs.org'));
     const name = args[5].startsWith(team) ? team : 'dsh-team-roles';
-    assert.equal(args[5], name === team ? `${team}@0.2.2-alpha.2` : await realpath(tarball));
+    assert.equal(args[5], name === team ? `${team}@0.2.2-alpha.3` : await realpath(tarball));
     await put(join(home, 'profiles/web/package.json'), { dsh: { profile: { bundles: [team, 'dsh-team-roles'] } } });
-    await installed(home, name, name === team ? '0.2.2-alpha.2' : '0.6.0');
+    await installed(home, name, name === team ? '0.2.2-alpha.3' : '0.6.0');
   } };
   return { ...f, home, workspace, options, calls };
 }

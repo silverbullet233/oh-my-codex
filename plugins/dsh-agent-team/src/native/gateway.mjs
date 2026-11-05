@@ -9,7 +9,7 @@ const required = ['native-session', 'durable-role-snapshots', 'native-role-setti
 const writes = new Set(['create', 'send', 'stop', 'prepareShutdown', 'withdrawInput']);
 export function verifyHealth(value, entry) {
   if (value?.ok !== true || value.api?.name !== 'dsh-team-roles' || value.api.version !== 1
-    || required.some(name => !value.api.capabilities?.includes(name)) || value.runtime?.packageVersion !== '0.2.2-alpha.2') throw new ClientError('CAPABILITY_MISMATCH', 'The owned host requires dsh-team-roles native API 1 and the exact supported runtime. No work was submitted.');
+    || required.some(name => !value.api.capabilities?.includes(name)) || value.runtime?.packageVersion !== '0.2.2-alpha.3') throw new ClientError('CAPABILITY_MISMATCH', 'The owned host requires dsh-team-roles native API 1 and the exact supported runtime. No work was submitted.');
   if (entry && (value.host?.pid !== entry.pid || value.host?.instanceId !== entry.instanceId || (entry.home && value.host?.home !== entry.home))) throw new ClientError('OWNERSHIP_MISMATCH', 'The responding host is not this client’s attributed instance.');
 }
 /** Disposable authenticated native Node Gateway. It owns no execution state. */

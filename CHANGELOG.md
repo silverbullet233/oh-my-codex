@@ -2,6 +2,14 @@
 
 Versions here describe the repository catalog. Each plugin has its own version.
 
+## 0.3.1
+
+Publication pending: this catalog/plugin candidate is **not tagged**, has **no GitHub Release assets** and is **not published**. The latest published installation pins remain catalog **v0.3.0** / plugin **0.4.0**.
+
+- Candidate runtime pin moves to exact DSH `0.2.2-alpha.3` with the corresponding Cordis-layer `*.alpha.2` sub-line (`@deepseek-ai/cordis@4.0.6-alpha.2`). Published catalog v0.3.0 / plugin 0.4.0 remains on DSH `0.2.2-alpha.2`.
+- DSH Agent Team 0.4.1 candidate requires the matching **unreleased dsh-team-roles 0.6.1 candidate build**; the published dsh-team-roles 0.6.0 archive supports only DSH `0.2.2-alpha.2`. A compatible host release must be published and verified before this candidate can be released.
+- No live provider inference is claimed. Validation is synthetic/no-model only; a new catalog tag/release is a separate maintainer decision.
+
 ## 0.3.0
 
 - Add an Agent-facing bootstrap guide using the existing setup and explicit MCP environment configuration.
