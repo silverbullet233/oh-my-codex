@@ -18,6 +18,7 @@ For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It 
 | --- | --- | --- |
 | `health` | `dsh_team_health` | Start/reuse the owned host and verify native API/runtime/home identity |
 | `web` | `dsh_team_web` | Open the authorized native Web entry; return only its clean origin |
+| `web_url` | `dsh_team_web_url` | Explicit secret-bearing query: return the existing owned host authenticated homepage URL after a required user-request acknowledgement; no browser, start, adoption or Team/session permalink |
 | `create` | `dsh_team_create` | Idempotent native Team creation and initial input admission |
 | `send` | `dsh_team_send` | Queue/steer the same Team with a durable input ID |
 | `status` | `dsh_team_status` | Native activity, member identity and configured/selected/used routes |

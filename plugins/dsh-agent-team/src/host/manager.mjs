@@ -10,6 +10,7 @@ import { ClientError } from '../native/errors.mjs';
 import { aborted } from '../native/interactions.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
+import { WEB_URL_ACKNOWLEDGEMENT, WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, requireWebUrlAcknowledgement } from './web-url.mjs';
 export function configuration(env = process.env) {
   return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000 };
 }
@@ -29,13 +30,18 @@ export async function initializeOwnedHome(home, cwd) {
 /** One owned ordinary Web host, reused across disposable MCP connections. */
 export class OwnedHost {
   constructor(config = configuration()) { this.config = config; }
-  async prepare() {
+  /** Read-only owned-home validation: loads the runtime and marker but creates no directory. */
+  async inspectOwned() {
     this.runtime ??= await loadRuntime(this.config.runtimeAnchor);
     this.config.home = await realpath(this.config.home);
     const marker = await readPrivate(join(this.config.home, '.codex-dsh-owner.json'));
     if (marker?.version !== 1 || marker.owner !== 'oh-my-codex/dsh-agent-team') throw new ClientError('SETUP_REQUIRED', 'Initialize a dedicated home with scripts/setup.mjs and install the host candidate there. Existing user Web processes are never reused.');
     this.cwd = marker.cwd;
-    this.directory = join(this.config.home, '.codex-owned'); await privateDirectory(this.directory);
+    this.directory = join(this.config.home, '.codex-owned');
+  }
+  async prepare() {
+    await this.inspectOwned();
+    await privateDirectory(this.directory);
   }
   async locked(action) {
     await this.prepare();
@@ -65,6 +71,41 @@ export class OwnedHost {
     if (entry.version !== 1 || entry.birthFormat !== 'utc-c-v1' || !Number.isSafeInteger(entry.pid) || entry.pid <= 0 || typeof entry.birth !== 'string' || !entry.birth || entry.home !== this.config.home || entry.runtimeAnchor !== this.runtime.anchor || typeof entry.instanceId !== 'string') throw new ClientError('OWNERSHIP_MISMATCH', 'Owned host metadata does not match this runtime.');
     if (birth(entry.pid) !== entry.birth) { await unlink(join(this.directory, 'instance.json')); return null; }
     return entry;
+  }
+  /**
+   * Explicit, secret-bearing read of the existing owned host's authenticated homepage URL.
+   * Never starts, adopts or restarts a host and never opens a browser. The Team must be an
+   * existing managed Lead/root on this owned host; member, unknown and foreign IDs fail closed.
+   */
+  async webUrl(params = {}, options = {}) {
+    aborted(options.signal);
+    requireWebUrlAcknowledgement(params.acknowledge);
+    if (typeof params.teamId !== 'string' || !params.teamId || params.teamId.length > 256) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url requires exactly one existing managed Lead/root Team ID. No URL was disclosed.');
+    let runtime = this.runtime;
+    let entry = this.entry;
+    if (!entry) {
+      await this.inspectOwned();
+      runtime = this.runtime;
+      entry = await this.current();
+      if (!entry) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not running. This query never starts, adopts or restarts one; start it explicitly with dsh_team_health first. No URL was disclosed.');
+    }
+    if (entry.home !== undefined && this.config.home !== undefined && entry.home !== this.config.home) throw new ClientError('OWNERSHIP_MISMATCH', 'The owned host entry belongs to a different home; no URL was disclosed.');
+    if (runtime?.anchor && entry.runtimeAnchor !== undefined && entry.runtimeAnchor !== runtime.anchor) throw new ClientError('OWNERSHIP_MISMATCH', 'The owned host entry belongs to a different runtime; no URL was disclosed.');
+    const { url, origin } = authenticatedHostEntry(entry);
+    let temporary;
+    const client = this.entry === entry && this.gateway ? this.gateway : (temporary = new GatewayClient({ runtime, entry }));
+    let status;
+    try {
+      status = await client.request('status', { teamId: params.teamId }, options);
+    } catch (error) {
+      if (error instanceof ClientError && ['team-roles/UNKNOWN_TEAM', 'UNKNOWN_TEAM'].includes(error.code)) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url only accepts an existing managed Lead/root Team on this owned host. Member, unknown and foreign Team IDs are not query targets. No URL was disclosed.');
+      if (error instanceof ClientError && ['AUTH_UNAVAILABLE', 'GATEWAY_UNAVAILABLE', 'INVALID_HOST_ENTRY'].includes(error.code)) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not reachable. This query never starts, adopts or restarts one; inspect it with dsh_team_health before retrying. No URL was disclosed.');
+      throw error;
+    } finally {
+      if (temporary) await temporary.close();
+    }
+    managedRootTeam(status, params.teamId);
+    return { teamId: params.teamId, scope: WEB_URL_SCOPE, url, origin, disclosure: { ...WEB_URL_DISCLOSURE } };
   }
   async ensure() {
     let failedRunner, diagnosticsPath;
@@ -122,6 +163,7 @@ export class OwnedHost {
     try {
       aborted(options.signal);
       if (method === 'shutdown') return await this.shutdown(options);
+      if (method === 'webUrl') return await this.webUrl(params, options);
       await this.ensure();
       aborted(options.signal);
       if (method === 'web') {

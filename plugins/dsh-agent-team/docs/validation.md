@@ -1,3 +1,5 @@
+The unreleased 0.3.1 / 0.4.1 candidate adds the explicit `dsh_team_web_url` disclosure command: protocol/argument gating, attributed-entry and managed-root validation, NO-side-effect behavior, verbatim URL fidelity with synthetic values, redacted errors, and setup host-version coherence are covered by candidate unit/transport tests. Keyless native acceptance for this candidate is **UNVERIFIED** in the current environment: its owned-host startup path requires process start-time inspection (`/bin/ps`), which the validating sandbox denies (`PROCESS_UNVERIFIABLE`); that is an environment limitation, not a pass or an incompatibility.
+
 # Validation scope
 
 Use Node 24.9.0, matching CI. Normal validation is keyless:
