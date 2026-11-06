@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 function run(args) { const result = spawnSync(process.execPath, args, { cwd: root, stdio: 'inherit' }); if (result.status !== 0) process.exit(result.status ?? 1); }
-const selected = ['links', 'orchestration', 'output', 'permissions', 'permission-admission', 'sandbox-handoff', 'web-url-memory'].map(name => `test/client/${name}.test.mjs`);
+const selected = ['links', 'orchestration', 'output', 'permissions', 'permission-admission', 'sandbox-handoff', 'codex-boundary-probe', 'web-url-memory'].map(name => `test/client/${name}.test.mjs`);
 for (const directory of ['test/mcp', 'test/package']) selected.push(...(await readdir(resolve(root, directory))).filter(name => name.endsWith('.test.mjs') && name !== 'stdio.test.mjs').map(name => `${directory}/${name}`));
 console.log('Isolated client gate uses signed synthetic contexts and in-memory Web queries. Socket, lifecycle, process-identity and browser fixtures are excluded.');
 run(['--test', '--test-skip-pattern=^summary works through pinned native transport', ...selected]);

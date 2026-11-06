@@ -110,7 +110,23 @@ Strict attestation remains an optional external integration contract. It has no 
 
 Protocol/admission tests exercise actual production modules with synthetic metadata. Native data-service tests exercise first-input/member/restored policy, including unknown network, plus independent-fork and disposal regressions. The CI synthetic launcher lifecycle test checks bootstrap, actual host PID, Gateway health/binding, continuation and guarded shutdown; its launcher deliberately provides no OS sandbox.
 
-The opt-in `scripts/test-codex-boundary.mjs /absolute/codex /absolute/host/repo` uses the real launcher, actual pinned DSH FileSystem and synthetic shell/background descendants without sockets or credentials. On this development environment the sole attempt exited **71**, `sandbox-exec: sandbox_apply: Operation not permitted`, before the probe ran. It was not retried or elevated. Thus real file/shell/background confinement, real Web/network behavior, whole native-host availability and initiating user-session behavior remain **unverified**. The test failure is not a pass or a completed automatic-inheritance acceptance.
+The opt-in `scripts/test-codex-boundary.mjs /absolute/codex /absolute/host/repo` uses the real launcher, actual pinned DSH FileSystem and synthetic shell/background descendants without sockets or credentials. It emits each check's `passed`/`failed`/`not-run` status, rejection phase and evidence layer. Native application refusals without an OS error cause are identified separately from `EPERM`/`EACCES`. Unexpected I/O errors, missing reports, launcher failures, unexecuted checks and cleanup failures cannot produce the final `boundary-passed` record. Both context disposal (`ctx.fiber.dispose()`) and temporary-directory cleanup run on failure; cleanup errors remain visible without replacing the primary error. Nineteen no-process fixture regressions cover these paths and run in the isolated gate.
+
+Development evidence on 2026-11-06, using `/opt/homebrew/bin/codex` (0.164.0): the original execution within the outer restricted runtime failed at `sandbox_apply` before bootstrap. A later formally approved single execution reached bootstrap but exposed the probe's incorrect `ctx.dispose()` call, which obscured the primary error. Neither attempt established boundary acceptance. After correcting the lifecycle API and placing path resolution inside rejection assertions, **one new native Codex `require_escalated` request was approved and executed**. The corrected probe and official launcher both exited 0 with these results:
+
+| Check | Result | Observed evidence |
+| --- | --- | --- |
+| Native allowed write | passed | Actual DSH FileSystem write and content readback |
+| Native blocked write | passed | `FS_PERMISSION_DENIED` caused by OS `EPERM` on staging-directory `mkdir` |
+| Native restricted read | passed | OS `EPERM` during `resolve`/`realpath`; `readText` did not execute |
+| Protected Node write | passed | OS `EPERM` on `open` |
+| Allowed shell write | passed | Shell exit 0 and content readback |
+| Background descendant write | passed | Shell `& wait`, exit 0 and content readback |
+| Denied shell write | passed | Shell exit 1, `Operation not permitted` |
+
+Context disposal, unchanged protected/private content, absence of blocked output files and temporary-root removal all passed. The request added no reusable approval prefix or persistent policy change. The inner state retained root-read, the one synthetic writable directory, its read-only protected file, its denied private file, restricted network and opaque future fields; no extra roots or sandbox flags were added.
+
+This proves only the exercised synthetic filesystem/shell/descendant boundary through the production launcher/bootstrap. It does **not** establish complete initiating Codex session inheritance, Codex approval/reviewer or YOLO behavior, managed-network/proxy policy, real Web/network behavior, or whole native-host/model/control-plane availability. Those remain **unverified**; keep the change Draft.
 
 ## Authenticated Web URL
 
