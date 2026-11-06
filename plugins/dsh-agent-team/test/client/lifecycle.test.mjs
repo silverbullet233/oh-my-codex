@@ -9,6 +9,47 @@ import { ownedFixture } from '../fixtures/owned.mjs';
 import { OwnedHost, initializeOwnedHome } from '../../src/host/manager.mjs';
 import { readPrivate, writePrivate, birth, delay } from '../../src/host/files.mjs';
 
+test('synthetic protocol launcher starts the entire host, attributes the actual host PID and retains guarded shutdown', { timeout: 15000 }, async t => {
+  // This launcher deliberately does NOT enforce a sandbox. It checks protocol,
+  // argv, bootstrap, native transport, ownership and lifetime mechanics only.
+  const fixture = await ownedFixture(t);
+  delete fixture.owner.config.permissionAuthority;
+  delete fixture.owner.config.permissionContext;
+  const launcher = join(fixture.home, 'synthetic-launcher');
+  await writeFile(launcher, `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport assert from 'node:assert/strict';\nconst args = process.argv.slice(2); assert.equal(args[0], 'sandbox'); assert.equal(args[1], '--sandbox-state-json'); assert.equal(args[3], '--'); assert.equal(JSON.parse(args[2]).futureField, 'must-survive'); const r = spawnSync(args[4], args.slice(5), { stdio: 'inherit', env: process.env }); process.exit(r.status ?? 1);\n`, { mode: 0o700 });
+  const state = { permissionProfile: { type: 'managed', file_system: { type: 'unrestricted' }, network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href, codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, futureField: 'must-survive' };
+  const options = { protocolMeta: { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: launcher } } };
+  const health = await fixture.owner.request('health', {}, options);
+  assert.equal(health.permissionSource.source, 'codex-request-metadata');
+  assert.equal(health.permissionSource.codexApproval, 'unknown');
+  assert.equal(health.execution.scope, 'entire-native-host');
+  assert.equal(health.host.pid, fixture.owner.entry.pid);
+  assert.equal(birth(health.host.pid), fixture.owner.entry.birth);
+  const created = await fixture.owner.request('create', { key: 'sandbox-protocol', cwd: fixture.home, text: 'synthetic launcher work' }, options);
+  assert.equal(created.permissionProfile.sandboxMode, 'danger-full-access');
+  assert.equal(created.permissions.approvalPolicy, 'ask');
+  await assert.rejects(fixture.owner.request('send', { teamId: created.teamId, inputId: 'metadata-lost', text: 'must not run' }), { code: 'HOST_PERMISSION_MISMATCH' });
+  await fixture.owner.request('send', { teamId: created.teamId, inputId: 'same-state', text: 'synthetic follow-up' }, options);
+  assert.equal(await fixture.starts(), 1);
+  await fixture.owner.request('stop', { teamId: created.teamId });
+  assert.equal((await fixture.owner.shutdown()).stopped, true);
+});
+
+test('sandbox launcher exit without a bootstrap identity keeps uncertain startup and refuses a replacement writer', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  delete fixture.owner.config.permissionAuthority;
+  delete fixture.owner.config.permissionContext;
+  const launcher = join(fixture.home, 'synthetic-failed-launcher');
+  await writeFile(launcher, `#!${process.execPath}\nprocess.exit(71);\n`, { mode: 0o700 });
+  const state = { permissionProfile: { type: 'managed', file_system: { type: 'unrestricted' }, network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
+  const options = { protocolMeta: { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: launcher } } };
+  await assert.rejects(fixture.owner.request('health', {}, options), { code: 'STARTUP_FAILED' });
+  const provisional = await readPrivate(join(fixture.home, '.codex-owned/starting.json'));
+  assert.equal(provisional.awaitingSandboxHostIdentity, true);
+  await assert.rejects(fixture.owner.request('health', {}, options), { code: 'STARTUP_UNCERTAIN' });
+  assert.equal(await readPrivate(join(fixture.home, '.codex-owned/instance.json')), null);
+});
+
 test('cancelled lifecycle requests cannot enter shutdown, startup or browser handoff', async t => {
   const owner = new OwnedHost({});
   owner.ensure = owner.shutdown = async () => assert.fail('Cancelled lifecycle action must not start');

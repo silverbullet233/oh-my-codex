@@ -10,7 +10,7 @@ export async function signedFixture(t, owner, { cleanup = true } = {}) {
   const config = owner?.config ?? { permissionAudience: 'synthetic-process-audience' };
   Object.assign(config, { permissionAuthority: join(root, 'authority.json'), permissionContext: join(root, 'context.json') });
   await writePrivate(config.permissionAuthority, { version: 1, publicKey: publicKey.export({ type: 'spki', format: 'pem' }) });
-  const payload = { version: 1, basis: 'effective-runtime', audience: config.permissionAudience, sessionId: 'synthetic-codex-session', issuedAt: Date.now() - 1000, expiresAt: Date.now() + 60000, boundaryId: 'synthetic-outer-boundary', permissions: { sandboxMode: 'workspace-write', approvalPolicy: 'on-request', writableRoots: [config.home ?? '/synthetic/workspace'], networkAccess: 'restricted' }, overrides: [] };
+  const payload = { version: 1, basis: 'effective-runtime', audience: config.permissionAudience, sessionId: 'synthetic-codex-session', issuedAt: Date.now() - 1000, expiresAt: Date.now() + 60000, boundaryId: 'synthetic-outer-boundary', permissions: { sandboxMode: 'workspace-write', approvalPolicy: 'on-request', writableRoots: [config.home ?? '/synthetic/workspace'], networkAccess: 'enabled' }, overrides: [] };
   const write = async (value = payload, key = privateKey, path = config.permissionContext) => { const text = JSON.stringify(value); await writePrivate(path, { payload: text, signature: sign(null, Buffer.from(text), key).toString('base64') }); };
   await write();
   const issue = (audience, path) => write({ ...payload, audience }, privateKey, path);

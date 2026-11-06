@@ -23,7 +23,7 @@ async function run(command, args, { cwd, env = process.env, input = '' }) {
   return result.stdout;
 }
 
-test('nested source, built folder and isolated tarball resolve MCP tools and fail closed without launch authority', async t => {
+test('nested source, built folder and isolated tarball resolve MCP tools and retain tools and native setup diagnostics without a signature', async t => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-dist-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await run(process.execPath, [join(pluginRoot, 'scripts/check.mjs')], { cwd: root });
@@ -53,7 +53,7 @@ test('nested source, built folder and isolated tarball resolve MCP tools and fai
     assert.equal(replies[0].result.serverInfo.name, 'dsh-agent-team');
     assert.equal(replies[1].result.tools.length, 18);
     assert.equal(replies[2].result.isError, true);
-    assert.equal(JSON.parse(replies[2].result.content[0].text).code, 'PERMISSION_CONTEXT_REQUIRED');
+    assert.equal(JSON.parse(replies[2].result.content[0].text).code, 'RUNTIME_REQUIRED');
     const url = replies[1].result.tools.find(tool => tool.name === 'dsh_team_web_url');
     assert.deepEqual(url.inputSchema.required, ['teamId']);
   }

@@ -96,7 +96,7 @@ export async function serveNativeFixture({ dispatch = async () => ({}), health =
     async call(method, request) {
       try {
         const value = await dispatch(method, request);
-        return method === 'health' ? { ok: true, api: health, sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.3' }, host: { pid: process.pid, instanceId: process.env.DSH_OWNED_INSTANCE_ID ?? null, home: process.env.DSH_HOME ? await realpath(process.env.DSH_HOME) : null, permissionBinding: process.env.DSH_AGENT_TEAM_LAUNCH_PERMISSION_BINDING ?? null }, ...value } : value;
+        return method === 'health' ? { ok: true, api: health, sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.3' }, host: { pid: process.pid, instanceId: process.env.DSH_OWNED_INSTANCE_ID ?? null, home: process.env.DSH_HOME ? await realpath(process.env.DSH_HOME) : null, permissionBinding: process.env.DSH_AGENT_TEAM_LAUNCH_PERMISSION_BINDING ?? null, permissionExecution: JSON.parse(process.env.DSH_AGENT_TEAM_LAUNCH_EXECUTION ?? 'null') }, ...value } : value;
       } catch (error) { throw new RemoteError(error.code ?? 'team-roles/NATIVE_FAILURE', error.message, {}); }
     }
     health(r) { return this.call('health', r); } create(r) { return this.call('create', r); }

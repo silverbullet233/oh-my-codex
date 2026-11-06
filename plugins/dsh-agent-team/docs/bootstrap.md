@@ -57,4 +57,4 @@ Use this guide only when the user explicitly authorizes plugin initialization. C
 
 ## Candidate permission handoff
 
-Before actual MCP health on this unreleased candidate, establish the [trusted permission handoff](permissions.md). Setup and environment flags cannot establish effective Codex permissions. Without a trusted external runtime authority, stop at that prerequisite; do not create signing keys or claim full access. The published release flow above is unchanged.
+This candidate supports the [experimental sandbox-state handoff](permissions.md). Without metadata, normal setup uses native read-only + ask and reports Codex sandbox/approval/network as unknown. Signing is optional; invalid explicitly configured strict mode fails. Do not create signing keys, infer YOLO from environment flags or claim full automatic inheritance. A received known sandbox is never ignored or widened for host startup. The published release flow above is unchanged.

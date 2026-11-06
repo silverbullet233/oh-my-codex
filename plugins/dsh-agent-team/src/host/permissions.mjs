@@ -1,8 +1,8 @@
-/** Permission facts come from a pinned supervisor signature, never Codex-looking env flags.
- * Signature verification authenticates the launcher's statement; it does not probe OS policy.
- */
+/** Keep native intent, signed statements and opaque protocol state distinct.
+ * Neither a declaration nor a signature is an independent OS-policy probe. */
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readPrivate } from './files.mjs';
 import { ClientError } from '../native/errors.mjs';
 import { isDeepStrictEqual } from 'node:util';
@@ -20,7 +20,34 @@ export function normalizePermissions(value) {
     || (value.sandboxMode === 'workspace-write' ? value.writableRoots.length === 0 : value.writableRoots.length !== 0)) fail();
   return { sandboxMode: value.sandboxMode, approvalPolicy: value.approvalPolicy === 'on-request' ? 'ask' : 'never', writableRoots: [...new Set(value.writableRoots)].sort(), networkAccess: value.networkAccess };
 }
-export async function readPermissionContext(config, now = Date.now()) {
+export async function readPermissionContext(config, now = Date.now(), metadata) {
+  // Configured strict mode is never weakened by a missing file, invalid signature
+  // or incoming metadata. An environment context path alone also opts into strict mode.
+  const strict = config.permissionAuthority !== undefined || config.permissionContext !== undefined;
+  const attested = strict ? await readAttestedContext(config, now) : null;
+  const opaque = sandboxContext(metadata);
+  if (opaque) {
+    if (attested || config.permissionProfile !== undefined) throw new ClientError('PERMISSION_CONTEXT_CONFLICT', 'Sandbox metadata cannot be combined with a separate permission profile or strict attestation. No work was submitted.');
+    return opaque;
+  }
+  if (attested) return attested;
+  let permissions = { sandboxMode: 'read-only', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' };
+  const source = config.permissionProfile === undefined ? 'native-default' : 'explicit-configuration';
+  if (config.permissionProfile !== undefined) {
+    try {
+      if (!isAbsolute(config.permissionProfile)) fail();
+      const value = await readPrivate(config.permissionProfile);
+      if (!keys(value, ['sandboxMode', 'approvalPolicy', 'writableRoots', 'networkAccess']) || !['ask', 'never'].includes(value.approvalPolicy)) fail();
+      const native = normalizePermissions({ ...value, approvalPolicy: value.approvalPolicy === 'ask' ? 'on-request' : 'never', networkAccess: value.networkAccess === 'unknown' ? 'enabled' : value.networkAccess });
+      permissions = { ...native, networkAccess: value.networkAccess };
+    } catch { throw new ClientError('PERMISSION_CONFIGURATION_INVALID', 'The explicitly configured private permission profile is invalid. No default fallback was attempted.'); }
+  }
+  const binding = { source, cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions };
+  return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
+    execution: { backend: 'native', filesystem: 'native-policy', network: 'unverified', approval: 'native-policy' },
+    provenance: { source, codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown', signatureVerified: false, osLimitsVerified: false } };
+}
+async function readAttestedContext(config, now) {
   if (!config.permissionAuthority || !config.permissionContext) fail('PERMISSION_CONTEXT_REQUIRED');
   if (!isAbsolute(config.permissionAuthority) || !isAbsolute(config.permissionContext)) fail();
   try {
@@ -47,13 +74,56 @@ export async function readPermissionContext(config, now = Date.now()) {
     });
     if (new Set(overrides.map(grant => grant.id)).size !== overrides.length) fail();
     const authority = fingerprint(publicKey.export({ type: 'spki', format: 'pem' }));
-    const binding = { authority, boundaryId: value.boundaryId, permissions };
+    const binding = { authority, boundaryId: value.boundaryId, permissions, source: 'launcher-attested', backend: 'native', cwd: resolve(config.cwd ?? process.cwd()) };
     return { binding, bindingHash: fingerprint(binding), permissions, overrides,
       provenance: { source: 'launcher-attested', signatureVerified: true, osLimitsVerified: false, basis: 'effective-runtime', sessionId: value.sessionId, expiresAt: value.expiresAt } };
   } catch (error) {
     if (error instanceof ClientError && error.code.startsWith('PERMISSION_CONTEXT_')) throw error;
     fail();
   }
+}
+
+/** Only tools/call protocol metadata reaches this function, never tool arguments.
+ * Keep the state opaque; inspecting the profile discriminator is solely an
+ * unsupported-boundary check, never a projection of filesystem grants.
+ */
+export function sandboxContext(metadata) {
+  if (metadata === undefined) return null;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new ClientError('SANDBOX_METADATA_INVALID', 'Invalid sandbox protocol metadata.');
+  const current = metadata['codex/sandbox-state'], legacy = metadata['codex/sandbox-state-meta'];
+  if (current === undefined && legacy === undefined) return null;
+  if (current !== undefined && legacy !== undefined && !isDeepStrictEqual(current, legacy)) throw new ClientError('SANDBOX_METADATA_CONFLICT', 'Conflicting sandbox state aliases. No work was submitted.');
+  const state = current ?? legacy;
+  let stateJson, cwd;
+  try {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error();
+    stateJson = JSON.stringify(state);
+    if (Buffer.byteLength(stateJson) > 65536) throw new Error();
+    cwd = fileURLToPath(state.sandboxCwd);
+    if (!isAbsolute(cwd) || cwd.includes('\0')) throw new Error();
+  } catch { throw new ClientError('SANDBOX_METADATA_INVALID', 'Sandbox state must be an opaque JSON object with a native file cwd.'); }
+  const launcher = metadata['codex/sandbox-launcher']?.codexExecutable;
+  if (launcher !== undefined && (typeof launcher !== 'string' || !isAbsolute(launcher) || launcher.includes('\0'))) throw new ClientError('SANDBOX_LAUNCHER_INVALID', 'The protocol sandbox launcher must be an absolute executable path.');
+  const supported = ['managed', 'disabled'].includes(state.permissionProfile?.type);
+  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' };
+  const binding = { source: 'codex-request-metadata', cwd, backend: 'codex-sandbox-host-v1', stateJson, launcher: launcher ?? null, permissions };
+  return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
+    sandbox: { stateJson, launcher, supported },
+    execution: { backend: binding.backend, scope: 'entire-native-host', filesystem: 'launcher-required', network: 'opaque-state-only', approval: 'native-ask', supported, launcherAvailable: !!launcher },
+    provenance: { source: binding.source, codexSandbox: 'opaque', codexApproval: 'unknown', codexNetwork: 'partial-opaque-state', signatureVerified: false, osLimitsVerified: false } };
+}
+
+export function requireExecutableContext(context) {
+  if (context.sandbox && !context.sandbox.supported) throw new ClientError('SANDBOX_STATE_UNSUPPORTED', 'External or unsupported sandbox state cannot be recreated locally. Observation remains available; no work was submitted.');
+  if (context.sandbox && !context.sandbox.launcher) throw new ClientError('SANDBOX_LAUNCHER_UNAVAILABLE', 'The caller supplied sandbox state without a supported local launcher. No PATH lookup or native fallback was attempted.');
+  if (!context.sandbox && context.permissions.networkAccess === 'restricted') throw new ClientError('NETWORK_ENFORCEMENT_UNAVAILABLE', 'Native DSH cannot enforce the requested restricted user-tool network. No work was submitted.');
+}
+
+/** Exact argv, no shell interpolation, extra readable roots or network exceptions. */
+export function sandboxInvocation(context, command) {
+  requireExecutableContext(context);
+  if (!context.sandbox) return { executable: command[0], argv: command.slice(1) };
+  return { executable: context.sandbox.launcher, argv: ['sandbox', '--sandbox-state-json', context.sandbox.stateJson, '--', ...command] };
 }
 export function selectPermissions(context, params) {
   if (params.permissionPreset === undefined && params.permissionAuthorization === undefined) return context.permissions;
@@ -69,7 +139,8 @@ export function profileAuthorized(context, profile) {
   return permitted.some(value => isDeepStrictEqual(value, permissions));
 }
 export function verifyHostBinding(entry, context, health) {
-  if (entry.permissionBinding !== context.bindingHash || (health && health.host?.permissionBinding !== context.bindingHash)) {
+  if (entry.permissionBinding !== context.bindingHash || (health && health.host?.permissionBinding !== context.bindingHash)
+    || (context.execution && (!isDeepStrictEqual(entry.permissionExecution, context.execution) || (health && !isDeepStrictEqual(health.host?.permissionExecution, context.execution))))) {
     throw new ClientError('HOST_PERMISSION_MISMATCH', 'The retained host has a different or unknown launch boundary. It was not reused, restarted or stopped; use a separately initialized home or explicitly coordinate its shutdown.');
   }
 }

@@ -11,9 +11,9 @@ import { aborted } from '../native/interactions.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
 import { WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, webUrlCancelled, webUrlCleanupError, webUrlError } from './web-url.mjs';
-import { readPermissionContext, selectPermissions, profileAuthorized, verifyHostBinding, verifyNativePermissions } from './permissions.mjs';
+import { readPermissionContext, requireExecutableContext, selectPermissions, profileAuthorized, verifyHostBinding, verifyNativePermissions } from './permissions.mjs';
 export function configuration(env = process.env, permissionAuthority) {
-  return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000, permissionAuthority, permissionContext: env.DSH_AGENT_TEAM_PERMISSION_CONTEXT };
+  return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), cwd: process.cwd(), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000, permissionAuthority, permissionContext: env.DSH_AGENT_TEAM_PERMISSION_CONTEXT };
 }
 export async function initializeOwnedHome(home, cwd) {
   await mkdir(home, { recursive: true, mode: 0o700 }); await privateDirectory(home);
@@ -62,7 +62,10 @@ export class OwnedHost {
     if (provisional.birthFormat !== 'utc-c-v1') throw new ClientError('STARTUP_UNCERTAIN', 'Older process attribution needs explicit inspection; no replacement writer was started.');
     const ready = await readPrivate(join(this.directory, `ready-${provisional.instanceId}.json`));
     const child = ready ?? provisional;
-    if (child.pid && (birth(child.pid) === null || birth(child.pid) !== child.birth)) { await unlink(path); return false; }
+    if (child.pid && (birth(child.pid) === null || birth(child.pid) !== child.birth)) {
+      if (provisional.awaitingSandboxHostIdentity) throw new ClientError('STARTUP_UNCERTAIN', 'The sandbox launcher exited before host identity was confirmed. Descendant exit is unknown; no replacement writer was started. Inspect the dedicated host.');
+      await unlink(path); return false;
+    }
     if (ready) {
       if (ready.instanceId !== provisional.instanceId || ready.home !== this.config.home || ready.runtimeAnchor !== this.runtime.anchor) throw new ClientError('OWNERSHIP_MISMATCH', 'Provisional native host does not match this owned home.');
       await writePrivate(join(this.directory, 'instance.json'), ready);
@@ -139,6 +142,7 @@ export class OwnedHost {
   }
   async ensure(context, { allowStart = true } = {}) {
     if (allowStart) context ??= await readPermissionContext(this.config);
+    if (context) requireExecutableContext(context);
     let failedRunner, diagnosticsPath;
     this.starting ??= this.locked(async () => {
       let entry = await this.current();
@@ -156,7 +160,7 @@ export class OwnedHost {
         diagnosticsPath = diagnosticPath(this.directory, instanceId);
         await writePrivate(diagnosticsPath, { version: 1, instanceId, text: '' });
         const launchPath = join(this.directory, `launch-${instanceId}.json`);
-        await writePrivate(launchPath, { ...this.config, cwd: this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId, permissionBinding: context.bindingHash });
+        await writePrivate(launchPath, { ...this.config, cwd: context.binding?.cwd ?? this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId, permissionBinding: context.bindingHash, sandbox: context.sandbox, permissionExecution: context.execution });
         const runner = spawn(process.execPath, [join(import.meta.dirname, 'runner.mjs'), this.directory, launchPath], { env: process.env, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
         await writePrivate(join(this.directory, 'starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'spawn-authorized', instanceId, supervisorPid: runner.pid, supervisorBirth: birth(runner.pid) });
         runner.send({ start: true });
@@ -202,7 +206,15 @@ export class OwnedHost {
       // Both ordinary and continued interaction replies can resume execution.
       // Even a denial encoded as a continued question calls userQuestions.answer.
       const admitsWork = ['create', 'send', 'answer', 'approval'].includes(method);
-      const context = allowStart || admitsWork ? await readPermissionContext(this.config) : null;
+      const context = allowStart || admitsWork ? await readPermissionContext(this.config, Date.now(), options.protocolMeta) : null;
+      if (context) {
+        try { requireExecutableContext(context); }
+        catch (error) {
+          if (method !== 'health') throw error;
+          // Capability observation must remain usable without spawning work.
+          return { ok: false, owned: false, permissionSource: context.provenance, execution: context.execution, limitation: { code: error.code, message: error.message } };
+        }
+      }
       if (method === 'create') selectPermissions(context, params);
       await this.ensure(context, { allowStart });
       aborted(options.signal);
@@ -227,7 +239,8 @@ export class OwnedHost {
           }
           verifyNativePermissions(status.permissions, status.permissionProfile);
         }
-        const fresh = await readPermissionContext(this.config);
+        const fresh = await readPermissionContext(this.config, Date.now(), options.protocolMeta);
+        requireExecutableContext(fresh);
         aborted(options.signal);
         if (this.gateway !== gateway || this.entry !== entry) throw new ClientError('HOST_PERMISSION_MISMATCH', 'The attributed host changed during admission. No work was submitted.');
         verifyHostBinding(entry, fresh, gateway.lastHealth);
@@ -235,8 +248,8 @@ export class OwnedHost {
         if (fresh.provenance.expiresAt <= Date.now()) throw new ClientError('PERMISSION_CONTEXT_INVALID', 'Permission context expired during admission. No work was submitted.');
       } : undefined;
       const value = await gateway.request(method, params, { ...options, beforeSubmit });
-      if (method === 'create') { verifyNativePermissions(value.permissions, params.permissionProfile); return { ...value, permissionSource: context.provenance, web: { url: new URL(this.entry.url).origin, scope: 'host' } }; }
-      return method === 'health' ? { ...value, permissionSource: context.provenance, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
+      if (method === 'create') { verifyNativePermissions(value.permissions, params.permissionProfile); return { ...value, permissionSource: context.provenance, execution: context.execution, web: { url: new URL(this.entry.url).origin, scope: 'host' } }; }
+      return method === 'health' ? { ...value, permissionSource: context.provenance, execution: context.execution, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
   }
   async shutdown({ signal } = {}) {

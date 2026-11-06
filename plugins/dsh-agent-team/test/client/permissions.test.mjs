@@ -8,20 +8,19 @@ import { signedFixture } from '../fixtures/permission-context.mjs';
 import { readPermissionContext, selectPermissions, verifyHostBinding, verifyNativePermissions } from '../../src/host/permissions.mjs';
 
 
-test('no flags, Codex-looking env or ordinary config default establish effective permissions', async () => {
+test('no flags or Codex-looking env override the honest native default', async () => {
   const config = configuration({ CODEX_SANDBOX: 'danger-full-access', CODEX_YOLO: 'true', DSH_AGENT_TEAM_PERMISSION_AUTHORITY: '/forged' });
   assert.equal(config.permissionAuthority, undefined);
-  await assert.rejects(readPermissionContext(config), { code: 'PERMISSION_CONTEXT_REQUIRED' });
-  const owner = new OwnedHost({}); let calls = 0;
-  owner.ensure = async () => calls++;
-  await assert.rejects(owner.request('create', {}), { code: 'PERMISSION_CONTEXT_REQUIRED' });
-  assert.equal(calls, 0);
+  const context = await readPermissionContext(config);
+  assert.equal(context.provenance.source, 'native-default');
+  assert.equal(context.provenance.codexSandbox, 'unknown');
+  assert.deepEqual(context.permissions, { sandboxMode: 'read-only', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' });
 });
 
-test('signed restricted and actual YOLO launch statements map all four permission dimensions honestly', async t => {
+test('synthetic signed workspace/full-access statements retain native intent without claiming OS verification', async t => {
   const f = await signedFixture(t);
   const context = await readPermissionContext(f.config);
-  assert.deepEqual(context.permissions, { sandboxMode: 'workspace-write', approvalPolicy: 'ask', writableRoots: ['/synthetic/workspace'], networkAccess: 'restricted' });
+  assert.deepEqual(context.permissions, { sandboxMode: 'workspace-write', approvalPolicy: 'ask', writableRoots: ['/synthetic/workspace'], networkAccess: 'enabled' });
   assert.equal(context.provenance.signatureVerified, true); assert.equal(context.provenance.osLimitsVerified, false);
   f.payload.permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'enabled' };
   await f.write();
@@ -45,7 +44,7 @@ test('forged signatures, altered payloads, expiry, wrong process, unsupported ap
 
 test('explicit overrides require the signed user grant, never a self-authored acknowledgement', async t => {
   const f = await signedFixture(t);
-  f.payload.overrides = [{ id: 'user-grant-1', preset: 'read-only', permissions: { sandboxMode: 'read-only', approvalPolicy: 'on-request', writableRoots: [], networkAccess: 'restricted' } }];
+  f.payload.overrides = [{ id: 'user-grant-1', preset: 'read-only', permissions: { sandboxMode: 'read-only', approvalPolicy: 'on-request', writableRoots: [], networkAccess: 'enabled' } }];
   await f.write(); const context = await readPermissionContext(f.config);
   for (const params of [{ permissionPreset: 'danger-full-access' }, { permissionPreset: 'read-only', permissionAuthorization: 'I approve' }, { permissionAuthorization: 'user-grant-1' }]) assert.throws(() => selectPermissions(context, params), { code: 'PERMISSION_AUTHORIZATION_REQUIRED' });
   assert.equal(selectPermissions(context, { permissionPreset: 'read-only', permissionAuthorization: 'user-grant-1' }).sandboxMode, 'read-only');
