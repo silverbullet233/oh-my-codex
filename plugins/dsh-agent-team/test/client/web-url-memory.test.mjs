@@ -7,6 +7,7 @@ import { OwnedHost, initializeOwnedHome } from '../../src/host/manager.mjs';
 import { writePrivate } from '../../src/host/files.mjs';
 import { createDispatcher } from '../../src/mcp/server.mjs';
 import { ClientError } from '../../src/native/errors.mjs';
+import { GatewayClient } from '../../src/native/gateway.mjs';
 
 const token = 'synthetic-memory-only';
 const entryUrl = `http://127.0.0.1:12345/?token=${token}`;
@@ -27,7 +28,7 @@ async function fixture(t) {
   const owner = new OwnedHost({ home, runtimeAnchor: runtime, _birth: () => live ? record.birth : null });
   owner.createGateway = (_entry, options) => {
     assert.deepEqual(options, { interactionMode: 'none' });
-    return { request: async (method, params, requestOptions) => { calls.push({ method, params }); if (failure) return failure(requestOptions); return status; }, close: async () => { if (cleanup) throw cleanup; } };
+    return { request: async (method, params, requestOptions) => { calls.push({ method, params }); if (failure) return failure(requestOptions); return status; }, close: async () => { if (typeof cleanup === 'function') return cleanup(); if (cleanup) throw cleanup; } };
   };
   owner.ensure = () => { throw new Error('must not start'); };
   return { owner, record, path, calls, setLive: value => { live = value; }, setStatus: value => { status = value; }, setFailure: value => { failure = value; }, setCleanup: value => { cleanup = value; } };
@@ -81,4 +82,50 @@ test('pre-cancellation and in-flight cancellation never disclose the synthetic c
   const current = new AbortController(), pending = f.owner.webUrl({ teamId: 'root' }, { signal: current.signal });
   await entered.promise; current.abort();
   await assert.rejects(pending, error => error.code === 'CANCELLED' && !error.message.includes(token));
+});
+
+test('cancellation during cleanup wins over success, primary failure and cleanup failure without disclosure', async t => {
+  for (const primary of [false, true]) for (const cleanupFails of [false, true]) {
+    const f = await fixture(t), controller = new AbortController();
+    if (primary) f.setFailure(() => { throw new ClientError('AUTH_UNAVAILABLE', entryUrl); });
+    f.setCleanup(async () => {
+      await Promise.resolve();
+      controller.abort(new Error(entryUrl));
+      if (cleanupFails) throw new Error(entryUrl);
+    });
+    await assert.rejects(f.owner.webUrl({ teamId: 'root' }, { signal: controller.signal }), error => error.code === 'CANCELLED' && !JSON.stringify(error).includes(token) && !error.message.includes(token));
+    assert.equal(f.calls.length, 1);
+  }
+});
+
+test('a cleanup failure preserves a safe primary mapping and never returns a credential', async t => {
+  const f = await fixture(t);
+  f.setFailure(() => { throw new ClientError('AUTH_UNAVAILABLE', entryUrl); });
+  f.setCleanup(new Error(entryUrl));
+  await assert.rejects(f.owner.webUrl({ teamId: 'root' }), error => error.code === 'HOST_NOT_RUNNING' && !error.message.includes(token));
+});
+
+test('real Gateway status cancellation abandons delayed and never-settling responses, then sanitizes cleanup', { timeout: 5000 }, async t => {
+  for (const lateResponse of [true, false]) for (const cleanupFails of [true, false]) {
+    const f = await fixture(t), controller = new AbortController();
+    const entered = Promise.withResolvers(), response = Promise.withResolvers();
+    let closed = 0;
+    f.owner.createGateway = entry => {
+      const gateway = new GatewayClient({ runtime: {}, entry, interactionMode: 'none' });
+      gateway.invalid = false; gateway.ready = async () => {};
+      gateway.ctx = {
+        remote: { roleTeams: { status: async () => { entered.resolve(); return response.promise; } } },
+        fiber: { dispose: async () => { closed++; if (cleanupFails) throw new Error(entryUrl); } },
+      };
+      return gateway;
+    };
+    const result = f.owner.webUrl({ teamId: 'root' }, { signal: controller.signal });
+    await entered.promise;
+    controller.abort(new Error(entryUrl));
+    await assert.rejects(result, error => error.code === 'CANCELLED' && !error.message.includes(token));
+    assert.equal(closed, 1);
+    // The operation already ended even if the remote never responds. A late
+    // successful response must not turn the cancelled query into a disclosure.
+    if (lateResponse) response.resolve({ ok: true, value: { sessionId: 'root', team: { members: [{ id: 'root' }] } } });
+  }
 });

@@ -8,7 +8,7 @@ These instructions target the published catalog **v0.3.0** / plugin **0.4.0**. U
 
 **Unreleased candidate (catalog 0.3.1 / plugin 0.4.1, this branch):** moves the exact runtime pin to DSH `0.2.2-alpha.3` and requires the matching **unreleased** dsh-team-roles 0.6.1 candidate build; the published 0.6.0 archive supports only `0.2.2-alpha.2`. The candidate is not tagged, has no Release assets and is not published. Validate it only from a locally built plugin in an isolated home; do not claim a release URL, digest or tag for it.
 
-For this candidate, configure the [trusted Codex permission handoff](docs/permissions.md) before startup or work. Missing/unverified context fails closed; automatic discovery is unavailable. The authenticated URL query is now `dsh_team_web_url({teamId})`.
+**Blocking candidate gap:** automatic Codex permission inheritance is unfinished, including YOLO. The default `mcp.json` has no trusted effective-permission publisher; health/startup and work return `PERMISSION_CONTEXT_REQUIRED`. The [signed handoff](docs/permissions.md) is an external integration contract, not an included working bridge or proof of OS enforcement. Keep this candidate Draft. The authenticated URL query is now `dsh_team_web_url({teamId})`.
 
 This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
 

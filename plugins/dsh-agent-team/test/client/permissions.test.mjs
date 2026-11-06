@@ -67,8 +67,9 @@ test('OwnedHost create inherits detached signed values and send refuses legacy o
   owner.entry = { permissionBinding: context.bindingHash, url: 'http://127.0.0.1:12345/' };
   owner.ensure = async () => {};
   const profile = { ...context.permissions, binding: context.bindingHash };
-  let status = { permissionProfile: profile };
-  owner.gateway = { request: async (method, params) => { calls.push({ method, params }); if (method === 'status') return status; return { teamId: 'root', permissions: { sandbox: { mode: profile.sandboxMode, workspaceRoot: '/synthetic/workspace' }, approvalPolicy: profile.approvalPolicy } }; } };
+  const permissions = { sandbox: { mode: profile.sandboxMode, workspaceRoot: '/synthetic/workspace' }, approvalPolicy: profile.approvalPolicy };
+  let status = { permissionProfile: profile, permissions };
+  owner.gateway = { request: async (method, params, options) => { await options?.beforeSubmit?.(); calls.push({ method, params }); if (method === 'status') return status; return { teamId: 'root', permissions }; } };
   await owner.request('create', { key: 'one', cwd: '/synthetic/workspace', text: 'Synthetic task' });
   assert.deepEqual(calls[0].params.permissionProfile, profile);
   await owner.request('send', { teamId: 'root', inputId: 'next', text: 'Synthetic follow-up' });
@@ -82,6 +83,6 @@ test('expired or replaced context after host preparation cannot admit create inp
   const context = await readPermissionContext(f.config);
   owner.entry = { permissionBinding: context.bindingHash, url: 'http://127.0.0.1:12345/' };
   owner.ensure = async () => { await f.write({ ...f.payload, expiresAt: Date.now() - 1 }); };
-  owner.gateway = { request: () => assert.fail('expired context must not reach native admission') };
+  owner.gateway = { request: async (_method, _params, options) => { await options.beforeSubmit(); assert.fail('expired context must not reach native admission'); } };
   await assert.rejects(owner.request('create', { key: 'expiry', cwd: '/synthetic/workspace', text: 'Synthetic task' }), { code: 'PERMISSION_CONTEXT_INVALID' });
 });

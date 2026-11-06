@@ -125,8 +125,8 @@ export class GatewayClient {
       await this.refreshPending(params.teamId, signal);
       return { teamId: params.teamId, interactions: this.interactions?.pending(params.teamId) ?? [] };
     }
-    if (method === 'answer') return this.interactions.answer(params);
-    if (method === 'approval') return this.interactions.approval(params);
+    if (method === 'answer') return this.interactions.answer(params, options.beforeSubmit);
+    if (method === 'approval') return this.interactions.approval(params, options.beforeSubmit);
     if (method === 'escalate') return this.interactions.escalate(params);
     if (method === 'create' && params.permissionProfile && !this.lastHealth.api.capabilities.includes('create-permission-profile')) throw new ClientError('CAPABILITY_MISMATCH', 'This host cannot apply the exact inherited permission profile. No fallback was attempted.');
     if (method === 'create' && params.permissionPreset !== undefined
@@ -146,8 +146,16 @@ export class GatewayClient {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support live input withdrawal. No queue mutation, cold resume or fallback was attempted.');
     }
     if (method === 'stop') this.wake();
+    // Permission admission must follow connection/reconnection and capability
+    // checks, immediately before the operation that can start native work.
+    await options.beforeSubmit?.();
+    aborted(signal);
     try {
-      const result = await this.ctx.remote.roleTeams[method](params);
+      const operation = this.ctx.remote.roleTeams[method](params);
+      // Passive reads can be abandoned safely. A native response may ignore the
+      // signal or never settle; do not wait for it to finish before cancellation.
+      const result = await (writes.has(method) ? operation : untilAbort(operation, signal));
+      if (!writes.has(method)) aborted(signal);
       if (!result.ok) {
         if (result.error.code?.startsWith('gateway/')) { this.invalid = true; throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain create/input IDs and inspect status before retrying.'); }
         throw new ClientError(result.error.code, result.error.message);
@@ -165,6 +173,7 @@ export class GatewayClient {
       }
       return method === 'health' ? this.healthValue(result.value) : result.value;
     } catch (error) {
+      if (!writes.has(method)) aborted(signal);
       if (error instanceof ClientError) throw error;
       this.invalid = true;
       throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain IDs; work continues independently and admission may be uncertain.');

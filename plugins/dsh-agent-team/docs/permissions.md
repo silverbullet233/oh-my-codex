@@ -1,6 +1,14 @@
 # Codex permission handoff (unreleased candidate)
 
-The client now requires a trusted launch-context handoff before starting a host or admitting work. Omit `permissionPreset` to inherit that context. It carries the sandbox mode, approval policy, explicit writable roots and network access. No Codex environment variable, YOLO flag, ordinary config file or preset name establishes actual effective permissions. This repository has no official Codex effective-permission discovery API integration; without a trusted external launcher, startup/create/send fail closed rather than assuming full access. Published releases retain their documented behavior.
+The client now requires a trusted launch-context handoff before starting a host or admitting work. Omit `permissionPreset` to inherit that context. It carries the sandbox mode, approval policy, explicit writable roots and network access. No Codex environment variable, YOLO flag, ordinary config file or preset name establishes actual effective permissions. This repository has no official Codex effective-permission discovery API integration; without a trusted external launcher, startup/create/send/answer/approval fail closed rather than assuming full access. Published releases retain their documented behavior.
+
+## Blocking implementation gap
+
+**Automatic inheritance is unfinished, including YOLO. Keep this candidate Draft.** The shipped `mcp.json` starts the MCP entrypoint without a permission authority or a publisher. A default installation therefore returns `PERMISSION_CONTEXT_REQUIRED` for health/startup and work. The signed protocol below is an admission contract for an external launcher, not a working Codex integration or evidence of OS confinement. There is no included trusted supervisor implementation or production enrollment procedure.
+
+The investigation used local Codex CLI **0.164.0**, its generated experimental App Server JSON schemas, and the official [MCP documentation](https://developers.openai.com/codex/mcp), [App Server protocol](https://developers.openai.com/codex/app-server), and [permission boundaries](https://developers.openai.com/codex/permissions). App Server start/resume responses expose permission settings to their caller; `thread/read` does not expose those fields. No supported bridge was established from this ordinary MCP process to the initiating session's live effective filesystem/approval/network restrictions, or from those responses to confinement of this MCP process and detached host descendants. Starting a different App Server or reading configuration would not establish that relationship. MCP processes use separate controls from sandboxed shell execution.
+
+Completion requires a platform integration that both obtains trusted current-session effective restrictions (including protected paths and network rules, beyond the reduced tuple here) and enforces them on all descendants before launch. Signatures or arbitrary configuration cannot fill that gap. Until such an integration is available and exercised, real Codex acquisition, OS/network enforcement and host reuse within that enforced boundary remain unverified. The isolated tests use temporary synthetic statements only.
 
 ## Establish trust outside the worker
 
@@ -51,6 +59,8 @@ The host's resolved native workspace root plus `additionalWritableRoots` must ex
 Pinned DSH has no equivalent network-policy setter. `networkAccess` is carried in the intent and reuse identity; enforcement must come from the supervisor's outer boundary. The plugin cannot install a new network sandbox or remove an inherited restriction. All process identity guards remain intact; an unverifiable PID/start time still blocks reuse and signaling.
 
 A fresh Lead receives and verifies native mode/approval before its first task. New managed members inherit that exact profile before queued work, including `ask` (upstream normally seeds `never`). Durable member markers and restored Lead snapshots are verified without rewriting existing work. Old Teams without a profile are observable but cannot receive new work through the new client. Direct native owners retain native API behavior; this client contract is not a global restriction on Web or every upstream channel.
+
+`send`, question answers and all approval replies require a matching Team profile and a fresh native root permission snapshot. Admission follows Gateway readiness/reconnection and rechecks the context's expiry, contents and retained/responding host binding immediately before native submission. Continued answers enqueue a new native input; even a continued denial can resume execution and requires this check. A failed preflight leaves the interaction pending for a fresh authorized retry. Stop, exact pending-input withdrawal, escalation and passive observations retain the existing-host-only path; they cannot start a host or enqueue continuation.
 
 ## User-authorized overrides and reuse
 

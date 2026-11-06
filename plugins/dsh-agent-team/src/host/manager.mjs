@@ -126,8 +126,10 @@ export class OwnedHost {
     // Cleanup runs separately: a disposal failure must neither override an actionable
     // primary error mapping nor be swallowed into a successful disclosure.
     try { await client.close(); } catch (error) { cleanupError = error; }
+    // close() can itself observe cancellation, including when it also fails.
+    // Never return the credential after cancellation in any cleanup path.
+    if (options.signal?.aborted) throw webUrlCancelled();
     if (primaryError) {
-      if (options.signal?.aborted) throw webUrlCancelled();
       // Known safe failures are reconstructed with static token-free messages; any
       // other status/transport error is replaced by a generic wrapper.
       throw webUrlError(primaryError);
@@ -197,7 +199,10 @@ export class OwnedHost {
       if (method === 'shutdown') return await this.shutdown(options);
       if (method === 'webUrl') return await this.webUrl(params, options);
       const allowStart = ['health', 'web', 'create', 'send'].includes(method);
-      const context = allowStart ? await readPermissionContext(this.config) : null;
+      // Both ordinary and continued interaction replies can resume execution.
+      // Even a denial encoded as a continued question calls userQuestions.answer.
+      const admitsWork = ['create', 'send', 'answer', 'approval'].includes(method);
+      const context = allowStart || admitsWork ? await readPermissionContext(this.config) : null;
       if (method === 'create') selectPermissions(context, params);
       await this.ensure(context, { allowStart });
       aborted(options.signal);
@@ -207,23 +212,29 @@ export class OwnedHost {
         const { permissionAuthorization, ...request } = params;
         params = { ...request, permissionProfile: { ...permissions, binding: context.bindingHash } };
       }
-      if (method === 'send') {
-        const status = await this.gateway.request('status', { teamId: params.teamId }, options);
-        const permissions = status.permissionProfile;
-        if (!profileAuthorized(context, permissions)) {
-          throw new ClientError('PERMISSION_MISMATCH', 'The Team permission intent is absent or no longer authorized by this launch context. No input was submitted.');
-        }
-      }
       aborted(options.signal);
       if (method === 'web') {
         return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
       }
-      if (method === 'create' || method === 'send') {
+      const gateway = this.gateway, entry = this.entry;
+      const beforeSubmit = admitsWork ? async () => {
+        aborted(options.signal);
+        if (this.gateway !== gateway || this.entry !== entry) throw new ClientError('HOST_PERMISSION_MISMATCH', 'The attributed host changed during admission. No work was submitted.');
+        if (method !== 'create') {
+          const status = await gateway.request('status', { teamId: params.teamId }, options);
+          if (!profileAuthorized(context, status.permissionProfile)) {
+            throw new ClientError('PERMISSION_MISMATCH', 'The Team permission intent is absent or no longer authorized by this launch context. No work was submitted.');
+          }
+          verifyNativePermissions(status.permissions, status.permissionProfile);
+        }
         const fresh = await readPermissionContext(this.config);
-        verifyHostBinding(this.entry, fresh);
+        aborted(options.signal);
+        if (this.gateway !== gateway || this.entry !== entry) throw new ClientError('HOST_PERMISSION_MISMATCH', 'The attributed host changed during admission. No work was submitted.');
+        verifyHostBinding(entry, fresh, gateway.lastHealth);
         if (JSON.stringify(fresh) !== JSON.stringify(context)) throw new ClientError('PERMISSION_CONTEXT_CHANGED', 'Permission context changed during admission. No work was submitted.');
-      }
-      const value = await this.gateway.request(method, params, options);
+        if (fresh.provenance.expiresAt <= Date.now()) throw new ClientError('PERMISSION_CONTEXT_INVALID', 'Permission context expired during admission. No work was submitted.');
+      } : undefined;
+      const value = await gateway.request(method, params, { ...options, beforeSubmit });
       if (method === 'create') { verifyNativePermissions(value.permissions, params.permissionProfile); return { ...value, permissionSource: context.provenance, web: { url: new URL(this.entry.url).origin, scope: 'host' } }; }
       return method === 'health' ? { ...value, permissionSource: context.provenance, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
