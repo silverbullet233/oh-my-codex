@@ -1,18 +1,18 @@
 /** Fake CLI process serves official Connection/Gateway with durable synthetic receipts. */
 import { readFile, writeFile, appendFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { serveNativeFixture } from './native-server.mjs';
+import { serveNativeFixture, contract } from './native-server.mjs';
 const home = process.env.DSH_HOME;
 if (process.env.DSH_FIXTURE_FAIL === '1') process.exit(2);
 await appendFile(join(home, 'starts'), 'start\n');
 let data; try { data = JSON.parse(await readFile(join(home, 'fixture.json'), 'utf8')); } catch { data = { teams: {}, active: false }; }
 const save = () => writeFile(join(home, 'fixture.json'), JSON.stringify(data));
-const server = await serveNativeFixture({ dispatch: async (method, request) => {
+const server = await serveNativeFixture({ health: { ...contract, capabilities: [...contract.capabilities, 'create-permission-profile'] }, dispatch: async (method, request) => {
   if (method === 'health') return { roles: { configured: false, leadRole: '', roles: [] } };
-  if (method === 'create') { data.teams[request.key] ??= { teamId: request.key, sessionId: request.key }; data.active = request.text === 'hang'; await save(); return { ...data.teams[request.key], accepted: true, processed: null }; }
+  if (method === 'create') { data.teams[request.key] ??= { teamId: request.key, sessionId: request.key, permissionProfile: request.permissionProfile }; data.active = request.text === 'hang'; await save(); return { ...data.teams[request.key], accepted: true, processed: null, permissions: { sandbox: { mode: request.permissionProfile.sandboxMode, workspaceRoot: request.cwd, ...(request.permissionProfile.writableRoots.length > 1 ? { additionalWritableRoots: request.permissionProfile.writableRoots.filter(root => root !== request.cwd) } : {}) }, approvalPolicy: request.permissionProfile.approvalPolicy } }; }
   if (method === 'stop') { data.active = false; await save(); return { accepted: true, quiescent: true }; }
   if (method === 'prepareShutdown' || method === 'activity') return { safeToStop: !data.active, leaseExpiresAt: Date.now() + 5000 };
-  if (method === 'status') return { teamId: request.teamId, sessionId: request.teamId, runtimeState: data.active ? 'running' : 'idle' };
+  if (method === 'status') return { teamId: request.teamId, sessionId: request.teamId, runtimeState: data.active ? 'running' : 'idle', permissionProfile: data.teams[request.teamId]?.permissionProfile };
   return { accepted: true, completed: !data.active };
 } });
 const url = server.url;

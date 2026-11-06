@@ -5,7 +5,6 @@ import { pathToFileURL } from 'node:url';
 import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { ownedFixture } from '../fixtures/owned.mjs';
 
 const pluginRoot = resolve(import.meta.dirname, '../..');
 const repositoryRoot = resolve(pluginRoot, '../..');
@@ -24,7 +23,7 @@ async function run(command, args, { cwd, env = process.env, input = '' }) {
   return result.stdout;
 }
 
-test('nested source, built folder and isolated tarball resolve MCP tools without repository cwd or dependencies', async t => {
+test('nested source, built folder and isolated tarball resolve MCP tools and fail closed without launch authority', async t => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-dist-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await run(process.execPath, [join(pluginRoot, 'scripts/check.mjs')], { cwd: root });
@@ -34,7 +33,6 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
   await run('tar', ['-xzf', join(root, packed.filename), '-C', root], { cwd: root });
   const packagedRoot = join(root, 'package');
   await assert.rejects(access(join(packagedRoot, 'node_modules')), error => error.code === 'ENOENT');
-  const fixture = await ownedFixture(t);
   const requests = [
     { jsonrpc: '2.0', id: 1, method: 'initialize' },
     { jsonrpc: '2.0', id: 2, method: 'tools/list' },
@@ -49,13 +47,14 @@ test('nested source, built folder and isolated tarball resolve MCP tools without
     const output = await run(config.command, config.args.map(expand), {
       // Deliberately disregard declared cwd: entrypoints must also work from elsewhere.
       cwd: directory === pluginRoot ? repositoryRoot : root,
-      env: fixture.env, input: requests,
+      env: { PATH: process.env.PATH }, input: requests,
     });
     const replies = output.trim().split('\n').map(JSON.parse);
     assert.equal(replies[0].result.serverInfo.name, 'dsh-agent-team');
     assert.equal(replies[1].result.tools.length, 18);
-    assert.equal(replies[2].result.structuredContent.ok, true);
-    assert.equal(replies[2].result.structuredContent.api.version, 1);
+    assert.equal(replies[2].result.isError, true);
+    assert.equal(JSON.parse(replies[2].result.content[0].text).code, 'PERMISSION_CONTEXT_REQUIRED');
+    const url = replies[1].result.tools.find(tool => tool.name === 'dsh_team_web_url');
+    assert.deepEqual(url.inputSchema.required, ['teamId']);
   }
-  assert.equal(await fixture.starts(), 1);
 });

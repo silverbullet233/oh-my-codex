@@ -4,15 +4,17 @@ import { readFile, writeFile, access, chmod, mkdtemp, rm } from 'node:fs/promise
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { once } from 'node:events';
+import { authorizeSyntheticMcp, signedFixture } from '../fixtures/permission-context.mjs';
 import { ownedFixture } from '../fixtures/owned.mjs';
 import { OwnedHost, initializeOwnedHome } from '../../src/host/manager.mjs';
 import { readPrivate, writePrivate, birth, delay } from '../../src/host/files.mjs';
 
-test('cancelled lifecycle requests cannot enter shutdown, startup or browser handoff', async () => {
+test('cancelled lifecycle requests cannot enter shutdown, startup or browser handoff', async t => {
   const owner = new OwnedHost({});
   owner.ensure = owner.shutdown = async () => assert.fail('Cancelled lifecycle action must not start');
   const reason = Object.assign(new Error('MCP cancelled'), { code: 'CANCELLED' });
   for (const method of ['shutdown', 'web']) await assert.rejects(owner.request(method, {}, { signal: AbortSignal.abort(reason) }), { code: 'CANCELLED' });
+  await signedFixture(t, owner);
   const entered = Promise.withResolvers(), release = Promise.withResolvers(), controller = new AbortController();
   owner.ensure = async () => { entered.resolve(); await release.promise; };
   const web = owner.request('web', {}, { signal: controller.signal });
@@ -147,9 +149,11 @@ test('MCP death during startup releases coordination but preserves the same prov
   const source = await readFile(cli, 'utf8');
   await writeFile(cli, `await new Promise(resolve=>setTimeout(resolve,500)); await import(${JSON.stringify(new URL('../fixtures/owned-cli.mjs', import.meta.url).href)});`);
   const { spawn } = await import('node:child_process');
-  const client = spawn(process.execPath, [new URL('../../src/mcp/main.mjs', import.meta.url).pathname], { env: fixture.env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const contextPath = join(fixture.home, 'killed-mcp-context.json');
+  const client = spawn(process.execPath, [new URL('../../src/mcp/main.mjs', import.meta.url).pathname, '--permission-authority', fixture.config.permissionAuthority], { env: { ...fixture.env, DSH_AGENT_TEAM_PERMISSION_CONTEXT: contextPath }, stdio: ['pipe', 'pipe', 'pipe'] });
   client.stdout.resume(); client.stderr.resume(); const exited = once(client, 'exit');
   t.after(() => { if (client.exitCode === null && client.signalCode === null) client.kill('SIGKILL'); });
+  await authorizeSyntheticMcp(client, contextPath, fixture.issue);
   client.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }) + '\n' + JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } }) + '\n');
   let provisional;
   for (let i = 0; i < 200; i++) { provisional = await readPrivate(join(fixture.home, '.codex-owned/starting.json')); if (provisional?.pid) break; await delay(10); }

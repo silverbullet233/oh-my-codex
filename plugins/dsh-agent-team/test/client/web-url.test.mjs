@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { initializeOwnedHome, OwnedHost } from '../../src/host/manager.mjs';
 import { writePrivate } from '../../src/host/files.mjs';
 import { loadRuntime } from '../../src/native/runtime.mjs';
-import { WEB_URL_ACKNOWLEDGEMENT, authenticatedHostEntry, managedRootTeam, webUrlError } from '../../src/host/web-url.mjs';
+import { authenticatedHostEntry, managedRootTeam, webUrlError } from '../../src/host/web-url.mjs';
 import { createDispatcher } from '../../src/mcp/server.mjs';
 import { GatewayClient } from '../../src/native/gateway.mjs';
 import { ownedFixture } from '../fixtures/owned.mjs';
@@ -125,7 +125,7 @@ test('web URL query revalidates attribution on every disclosure and returns the 
     await assert.rejects(access(join(host.home, 'starts')), { code: 'ENOENT' });
   };
 
-  const result = await host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT });
+  const result = await host.owner.webUrl({ teamId: 'managed-root' });
   assert.equal(result.teamId, 'managed-root');
   assert.equal(result.scope, 'host');
   assert.equal(result.origin, host.origin);
@@ -146,7 +146,7 @@ test('web URL query revalidates attribution on every disclosure and returns the 
     cookieDefaultLifetimeDays: 30,
     cookieLifetimeNote: 'Upstream default cookieMaxAgeDays is 30 (configurable >= 1), authority-bound with absolute, non-sliding expiry; the actual configured value of this instance is not read by this query.',
     revocation: 'No logout API. Deleting or replacing the client-connection/browser-session credential record revokes cookies at the next Connection activation; clearing a cookie ends only that browser session.',
-    discovery: 'Startup, health, status, result, create and logs never include this URL or its token; only an explicitly acknowledged dsh_team_web_url call returns it.',
+    discovery: 'Startup, health, status, result, create and logs never include this URL or its token; only an explicitly requested dsh_team_web_url call returns it.',
     scopeNote: 'Owned-host homepage root. Upstream 0.2.2-alpha.3 exposes no Team or Session permalink; selecting a Team in Web remains in-app client state.',
   });
   assert.deepEqual(host.calls.map(call => call.method), ['health', 'status']);
@@ -158,7 +158,7 @@ test('web URL query revalidates attribution on every disclosure and returns the 
 
   // A matching cached foreground entry is accepted only after the same revalidation.
   host.owner.entry = { ...host.record };
-  const cached = await host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT });
+  const cached = await host.owner.webUrl({ teamId: 'managed-root' });
   assert(tokenOf(cached.url) === tokenOf(host.server.url));
   assert.deepEqual(host.connects, ['none', 'none']);
   await assertNoStart();
@@ -167,7 +167,7 @@ test('web URL query revalidates attribution on every disclosure and returns the 
 test('web URL query refuses stopped, replaced and PID-reused hosts without disclosing or starting anything', async t => {
   const host = await syntheticHost(t);
   const expectRefused = async (token) => {
-    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
       assert.equal(error.code, 'HOST_NOT_RUNNING');
       if (token) assert(!error.message.includes(token), 'errors must not repeat the launch token');
       return true;
@@ -208,22 +208,22 @@ test('web URL query fails closed on foreign homes, changed runtime anchors and u
   await host.live();
 
   await writePrivate(join(host.directory, 'instance.json'), { ...host.record, home: '/synthetic/foreign/home' });
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'OWNERSHIP_MISMATCH' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), { code: 'OWNERSHIP_MISMATCH' });
   assert.equal(host.calls.length, 0);
 
   await writePrivate(join(host.directory, 'instance.json'), { ...host.record, runtimeAnchor: '/synthetic/other/runtime/package.json' });
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'OWNERSHIP_MISMATCH' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), { code: 'OWNERSHIP_MISMATCH' });
   assert.equal(host.calls.length, 0);
 
   await rm(marker);
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'SETUP_REQUIRED' });
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), { code: 'SETUP_REQUIRED' });
   assert.equal(host.calls.length, 0);
 });
 
 test('web URL query refuses member, unknown and foreign Team identities after authenticated host validation', async t => {
   const host = await syntheticHost(t, { dispatchStatus: async () => { const error = new Error('The role service did not create the requested Team.'); error.code = 'team-roles/UNKNOWN_TEAM'; throw error; } });
   await host.live();
-  await assert.rejects(host.owner.webUrl({ teamId: 'synthetic-child', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'UNMANAGED_TEAM' && !error.message.includes(tokenOf(host.server.url)));
+  await assert.rejects(host.owner.webUrl({ teamId: 'synthetic-child' }), (error) => error.code === 'UNMANAGED_TEAM' && !error.message.includes(tokenOf(host.server.url)));
   assert.deepEqual(host.calls.map(call => call.method), ['health', 'status']);
   assert.deepEqual(host.connects, ['none']);
 });
@@ -232,25 +232,20 @@ test('web URL query fails closed on non-loopback entries and on an unreachable a
   const host = await syntheticHost(t);
   await host.live();
   await writePrivate(join(host.directory, 'instance.json'), { ...host.record, url: 'http://example.invalid:41234/?token=synthetic-only-token' });
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => error.code === 'INVALID_HOST_ENTRY' && !error.message.includes('synthetic-only-token'));
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => error.code === 'INVALID_HOST_ENTRY' && !error.message.includes('synthetic-only-token'));
   assert.equal(host.calls.length, 0);
   assert.equal(host.connects.length, 0, 'an invalid entry must not be contacted');
 
   const unreachable = await syntheticHost(t);
   await unreachable.live();
   await unreachable.server.close();
-  await assert.rejects(unreachable.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'HOST_NOT_RUNNING' });
+  await assert.rejects(unreachable.owner.webUrl({ teamId: 'managed-root' }), { code: 'HOST_NOT_RUNNING' });
 });
 
-test('web URL query requires the schema-level user acknowledgement before any host access', async t => {
+test('web URL query requires a managed Team before host access, with no confirmation-string argument', async t => {
   const host = await syntheticHost(t);
-  await host.live();
-  for (const acknowledge of [undefined, true, 'yes', 'reveal']) {
-    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge }), { code: 'ACKNOWLEDGEMENT_REQUIRED' });
-  }
-  await assert.rejects(host.owner.webUrl({ acknowledge: WEB_URL_ACKNOWLEDGEMENT }), { code: 'UNMANAGED_TEAM' });
-  assert.equal(host.calls.length, 0);
-  assert.equal(host.connects.length, 0);
+  await assert.rejects(host.owner.webUrl({}), { code: 'UNMANAGED_TEAM' });
+  assert.equal(host.calls.length, 0); assert.equal(host.connects.length, 0);
 });
 
 test('unexpected status/transport errors are sanitized so the credential-bearing entry never reaches errors or MCP responses', async t => {
@@ -269,7 +264,7 @@ test('unexpected status/transport errors are sanitized so the credential-bearing
   };
 
   // Direct bridge call: known-safe mapping is not weakened, unexpected failures are generic.
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
     assert.equal(error.code, 'WEB_URL_UNAVAILABLE');
     assertSanitized(error.message);
     return true;
@@ -278,7 +273,7 @@ test('unexpected status/transport errors are sanitized so the credential-bearing
   // MCP end-to-end: the client-facing error, content text and structured payload stay clean.
   const dispatch = createDispatcher(host.owner);
   await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
-  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT } } });
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root' } } });
   assert.equal(response.result.isError, true);
   const serialized = JSON.stringify(response);
   assertSanitized(serialized);
@@ -301,7 +296,7 @@ test('web URL query propagates cancellation promptly as a token-free CANCELLED e
   await host.live();
   const token = tokenOf(host.server.url);
   const pre = new AbortController(); pre.abort(new Error(`cancelled near ${host.server.url}`));
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }, { signal: pre.signal }), (error) => {
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }, { signal: pre.signal }), (error) => {
     assert.equal(error.code, 'CANCELLED');
     assert(!error.message.includes(token));
     return true;
@@ -313,7 +308,7 @@ test('web URL query propagates cancellation promptly as a token-free CANCELLED e
   const host2 = await syntheticHost(t, { dispatchStatus: async (_method, params) => { started.resolve(); await new Promise(() => {}); return statusFor(params.teamId); } });
   await host2.live();
   const controller = new AbortController();
-  const pending = host2.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }, { signal: controller.signal });
+  const pending = host2.owner.webUrl({ teamId: 'managed-root' }, { signal: controller.signal });
   await started.promise;
   controller.abort(new Error(`mid-flight cancel ${host2.server.url}`));
   await assert.rejects(pending, (error) => {
@@ -337,14 +332,14 @@ test('cleanup/disposal failures are token-free and never override actionable err
   try {
     // Successful native read but failing disposal: fail closed, never disclose, never leak.
     GatewayClient.prototype.close = async () => { throw leaky; };
-    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+    await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
       assert.equal(error.code, 'WEB_URL_UNAVAILABLE');
       assert(error.message.includes('did not finish safely'));
       return assertClean(error);
     });
     const dispatch = createDispatcher(host.owner);
     await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
-    const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT } } });
+    const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root' } } });
     assert.equal(response.result.isError, true);
     assert(!JSON.stringify(response).includes(token));
     assert.equal(JSON.parse(response.result.content[0].text).code, 'WEB_URL_UNAVAILABLE');
@@ -356,7 +351,7 @@ test('cleanup/disposal failures are token-free and never override actionable err
   await host2.live();
   try {
     GatewayClient.prototype.close = async () => { throw new Error(`dispose leak ${host2.server.url}`); };
-    await assert.rejects(host2.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+    await assert.rejects(host2.owner.webUrl({ teamId: 'managed-root' }), (error) => {
       assert.equal(error.code, 'WEB_URL_UNAVAILABLE');
       assert(!error.message.includes('did not finish safely'), 'cleanup must not override the primary failure mapping');
       assert(!error.message.includes(tokenOf(host2.server.url)));
@@ -369,7 +364,7 @@ test('cleanup/disposal failures are token-free and never override actionable err
   await host3.live();
   try {
     GatewayClient.prototype.close = async () => { throw new Error(`dispose leak ${host3.server.url}`); };
-    await assert.rejects(host3.owner.webUrl({ teamId: 'member-session', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+    await assert.rejects(host3.owner.webUrl({ teamId: 'member-session' }), (error) => {
       assert.equal(error.code, 'UNMANAGED_TEAM');
       assert(!error.message.includes(tokenOf(host3.server.url)));
       return true;
@@ -381,7 +376,6 @@ test('known sanitizer codes are reconstructed with static token-free messages', 
   const host = await syntheticHost(t);
   const leak = `upstream detail ${host.server.url} token=${tokenOf(host.server.url)}`;
   const cases = [
-    ['ACKNOWLEDGEMENT_REQUIRED', 'ACKNOWLEDGEMENT_REQUIRED'],
     ['HOST_NOT_RUNNING', 'HOST_NOT_RUNNING'],
     ['INVALID_HOST_ENTRY', 'INVALID_HOST_ENTRY'],
     ['OWNERSHIP_MISMATCH', 'OWNERSHIP_MISMATCH'],
@@ -421,20 +415,20 @@ test('malformed or unsafe credential-bearing metadata is sanitized and fails clo
     assert(!/Unexpected token|is not valid JSON|in JSON at position/i.test(text), 'raw parse/IO text must not reach the caller: ' + text);
     return true;
   };
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
     assert.equal(error.code, 'WEB_URL_UNAVAILABLE');
     return assertClean(error.message);
   });
   const dispatch = createDispatcher(host.owner);
   await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
-  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT } } });
+  const response = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web_url', arguments: { teamId: 'managed-root' } } });
   assert.equal(response.result.isError, true);
   assertClean(JSON.stringify(response));
 
   // Unsafe (group-readable) private metadata is a static UNSAFE_STATE failure.
   await writeFile(instance, JSON.stringify({ ...host.record, url: `http://127.0.0.1:1/?token=${token}` }));
   await chmod(instance, 0o644);
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
     assert.equal(error.code, 'UNSAFE_STATE');
     return assertClean(`${error.code} ${error.message}`);
   });
@@ -443,7 +437,7 @@ test('malformed or unsafe credential-bearing metadata is sanitized and fails clo
   const marker = join(host.home, '.codex-dsh-owner.json');
   await writeFile(marker, `not-json ${token} ${host.server.url}`);
   await chmod(marker, 0o600);
-  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root', acknowledge: WEB_URL_ACKNOWLEDGEMENT }), (error) => {
+  await assert.rejects(host.owner.webUrl({ teamId: 'managed-root' }), (error) => {
     assert.equal(error.code, 'WEB_URL_UNAVAILABLE');
     return assertClean(error.message);
   });

@@ -10,9 +10,10 @@ import { ClientError } from '../native/errors.mjs';
 import { aborted } from '../native/interactions.mjs';
 import { handoffBrowser } from './browser.mjs';
 import { diagnosticPath } from './output.mjs';
-import { WEB_URL_ACKNOWLEDGEMENT, WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, requireWebUrlAcknowledgement, webUrlCancelled, webUrlCleanupError, webUrlError } from './web-url.mjs';
-export function configuration(env = process.env) {
-  return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000 };
+import { WEB_URL_DISCLOSURE, WEB_URL_SCOPE, authenticatedHostEntry, managedRootTeam, webUrlCancelled, webUrlCleanupError, webUrlError } from './web-url.mjs';
+import { readPermissionContext, selectPermissions, profileAuthorized, verifyHostBinding, verifyNativePermissions } from './permissions.mjs';
+export function configuration(env = process.env, permissionAuthority) {
+  return { home: resolve(env.DSH_AGENT_TEAM_HOME ?? join(env.CODEX_HOME ?? join(homedir(), '.codex'), 'dsh-agent-team', 'host')), runtimeAnchor: env.DSH_AGENT_TEAM_RUNTIME, profile: 'web', startupTimeoutMs: 20000, permissionAuthority, permissionContext: env.DSH_AGENT_TEAM_PERMISSION_CONTEXT };
 }
 export async function initializeOwnedHome(home, cwd) {
   await mkdir(home, { recursive: true, mode: 0o700 }); await privateDirectory(home);
@@ -27,10 +28,12 @@ export async function initializeOwnedHome(home, cwd) {
   try { await file.writeFile(JSON.stringify(value)); await file.sync(); } finally { await file.close(); }
   return { ...value, created: true };
 }
+// Every OwnedHost in this MCP process shares one audience; another process cannot replay it.
+const permissionAudience = randomUUID();
 /** One owned ordinary Web host, reused across disposable MCP connections. */
 export class OwnedHost {
   constructor(config = configuration()) {
-    this.config = config;
+    this.config = { ...config, permissionAudience };
     // Isolated tests may inject a deterministic process-start verifier; production
     // configuration(env) never sets this, so the real birth() guard is unchanged.
     this.verifyBirth = config._birth ?? birth;
@@ -82,6 +85,7 @@ export class OwnedHost {
    * Never starts, adopts or restarts a host and never opens a browser. The Team must be an
    * existing managed Lead/root on this owned host; member, unknown and foreign IDs fail closed.
    */
+  createGateway(entry, options = {}) { return new GatewayClient({ runtime: this.runtime, entry, ...options }); }
   async webUrl(params = {}, options = {}) {
     // Static sanitized boundary for EVERY exit of the public operation: metadata parsing,
     // attribution, status/transport and cleanup failures can never surface arbitrary raw text
@@ -96,14 +100,12 @@ export class OwnedHost {
   }
   async queryWebUrl(params = {}, options = {}) {
     try { aborted(options.signal); } catch { throw webUrlCancelled(); }
-    requireWebUrlAcknowledgement(params.acknowledge);
     if (typeof params.teamId !== 'string' || !params.teamId || params.teamId.length > 256) throw new ClientError('UNMANAGED_TEAM', 'dsh_team_web_url requires exactly one existing managed Lead/root Team ID. No URL was disclosed.');
     // Revalidate the owned home, private metadata, runtime identity and instance
     // attribution on EVERY disclosure, including a cached foreground entry. The
     // gateway health handshake and the Team status read are not substitutes for
     // the local pid+birth attribution guard in current().
     await this.inspectOwned();
-    const runtime = this.runtime;
     const entry = await this.current();
     if (!entry) throw new ClientError('HOST_NOT_RUNNING', 'The owned native Web host is not running. This query never starts, adopts or restarts one; start it explicitly with dsh_team_health first. No URL was disclosed.');
     const cached = this.entry;
@@ -115,7 +117,7 @@ export class OwnedHost {
     // A fresh passive connection (interactions=none) performs the one Team status
     // read; it never claims, answers or cancels native interactions and is closed
     // after use. No host is started, adopted, restarted or stopped.
-    const client = new GatewayClient({ runtime, entry, interactionMode: 'none' });
+    const client = this.createGateway(entry, { interactionMode: 'none' });
     let status, primaryError, cleanupError;
     try {
       status = await client.request('status', { teamId: params.teamId }, options);
@@ -133,10 +135,12 @@ export class OwnedHost {
     if (cleanupError) throw webUrlCleanupError();
     return { teamId: params.teamId, scope: WEB_URL_SCOPE, url, origin, disclosure: { ...WEB_URL_DISCLOSURE } };
   }
-  async ensure() {
+  async ensure(context, { allowStart = true } = {}) {
+    if (allowStart) context ??= await readPermissionContext(this.config);
     let failedRunner, diagnosticsPath;
     this.starting ??= this.locked(async () => {
       let entry = await this.current();
+      if (!entry && !allowStart) throw new ClientError('HOST_NOT_RUNNING', 'This observation/control requires an existing attributed host; no host was started.');
       const pendingDeadline = Date.now() + this.config.startupTimeoutMs + 5000;
       while (!entry) {
         const pending = await this.pendingStart(); entry = await this.current();
@@ -144,12 +148,13 @@ export class OwnedHost {
         if (Date.now() > pendingDeadline) throw new ClientError('STARTUP_PENDING', 'The attributed native host is still starting or stopping; no second writer was started.');
         await delay(25);
       }
+      if (entry && context) verifyHostBinding(entry, context);
       if (!entry) {
         const instanceId = randomUUID();
         diagnosticsPath = diagnosticPath(this.directory, instanceId);
         await writePrivate(diagnosticsPath, { version: 1, instanceId, text: '' });
         const launchPath = join(this.directory, `launch-${instanceId}.json`);
-        await writePrivate(launchPath, { ...this.config, cwd: this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId });
+        await writePrivate(launchPath, { ...this.config, cwd: this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId, permissionBinding: context.bindingHash });
         const runner = spawn(process.execPath, [join(import.meta.dirname, 'runner.mjs'), this.directory, launchPath], { env: process.env, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
         await writePrivate(join(this.directory, 'starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'spawn-authorized', instanceId, supervisorPid: runner.pid, supervisorBirth: birth(runner.pid) });
         runner.send({ start: true });
@@ -165,9 +170,10 @@ export class OwnedHost {
         entry = await this.current();
         if (!entry) throw new ClientError('STARTUP_FAILED', 'The owned host exited before readiness could be confirmed.');
       }
-      if (this.entry?.instanceId !== entry.instanceId) { await this.gateway?.close(); this.gateway = new GatewayClient({ runtime: this.runtime, entry }); }
+      if (this.entry?.instanceId !== entry.instanceId) { await this.gateway?.close(); this.gateway = this.createGateway(entry); }
       this.entry = entry;
-      await this.gateway.request('health');
+      const health = await this.gateway.request('health');
+      if (context) verifyHostBinding(entry, context, health);
       return entry;
     }).catch(async error => {
       // The runner needs this lock for exit cleanup, so wait only after locked() releases it.
@@ -190,14 +196,36 @@ export class OwnedHost {
       aborted(options.signal);
       if (method === 'shutdown') return await this.shutdown(options);
       if (method === 'webUrl') return await this.webUrl(params, options);
-      await this.ensure();
+      const allowStart = ['health', 'web', 'create', 'send'].includes(method);
+      const context = allowStart ? await readPermissionContext(this.config) : null;
+      if (method === 'create') selectPermissions(context, params);
+      await this.ensure(context, { allowStart });
+      aborted(options.signal);
+      if (context) verifyHostBinding(this.entry, context);
+      if (method === 'create') {
+        const permissions = selectPermissions(context, params);
+        const { permissionAuthorization, ...request } = params;
+        params = { ...request, permissionProfile: { ...permissions, binding: context.bindingHash } };
+      }
+      if (method === 'send') {
+        const status = await this.gateway.request('status', { teamId: params.teamId }, options);
+        const permissions = status.permissionProfile;
+        if (!profileAuthorized(context, permissions)) {
+          throw new ClientError('PERMISSION_MISMATCH', 'The Team permission intent is absent or no longer authorized by this launch context. No input was submitted.');
+        }
+      }
       aborted(options.signal);
       if (method === 'web') {
         return { ...await handoffBrowser(this.entry.url), diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) } };
       }
+      if (method === 'create' || method === 'send') {
+        const fresh = await readPermissionContext(this.config);
+        verifyHostBinding(this.entry, fresh);
+        if (JSON.stringify(fresh) !== JSON.stringify(context)) throw new ClientError('PERMISSION_CONTEXT_CHANGED', 'Permission context changed during admission. No work was submitted.');
+      }
       const value = await this.gateway.request(method, params, options);
-      if (method === 'create') return { ...value, web: { url: new URL(this.entry.url).origin, scope: 'host' } };
-      return method === 'health' ? { ...value, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
+      if (method === 'create') { verifyNativePermissions(value.permissions, params.permissionProfile); return { ...value, permissionSource: context.provenance, web: { url: new URL(this.entry.url).origin, scope: 'host' } }; }
+      return method === 'health' ? { ...value, permissionSource: context.provenance, diagnostics: { path: diagnosticPath(this.directory, this.entry.instanceId) }, web: { url: new URL(this.entry.url).origin }, owned: true } : value;
     } catch (error) { throw this.withDiagnostics(error); }
   }
   async shutdown({ signal } = {}) {
@@ -212,7 +240,7 @@ export class OwnedHost {
         if (!entry) return { stopped: true, alreadyStopped: true };
       }
       supervisor = { pid: entry.supervisorPid, birth: birth(entry.supervisorPid) };
-      const client = new GatewayClient({ runtime: this.runtime, entry });
+      const client = this.createGateway(entry);
       try {
         await client.request('health', {}, { signal });
         const guard = await client.request('prepareShutdown', {}, { signal });

@@ -128,6 +128,7 @@ export class GatewayClient {
     if (method === 'answer') return this.interactions.answer(params);
     if (method === 'approval') return this.interactions.approval(params);
     if (method === 'escalate') return this.interactions.escalate(params);
+    if (method === 'create' && params.permissionProfile && !this.lastHealth.api.capabilities.includes('create-permission-profile')) throw new ClientError('CAPABILITY_MISMATCH', 'This host cannot apply the exact inherited permission profile. No fallback was attempted.');
     if (method === 'create' && params.permissionPreset !== undefined
       && !this.lastHealth.api.capabilities.includes('create-permission-preset')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support explicit create-time permission presets. No work was submitted; do not drop the requested preset or fall back.');

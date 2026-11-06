@@ -65,7 +65,7 @@ test('create-time permissions require explicit choice and keep native approval s
   const skill = await read('skills/dsh-agent-team/SKILL.md');
   for (const clause of ['Only an explicit user selection', 'never infer them from the name or self-upgrade', 'Existing/restored Teams are checked read-only', '`never` denies actions', 'Workspace admission is not complete process confinement']) assert(skill.includes(clause));
   const description = tools.find(tool => tool.name === 'dsh_team_create').inputSchema.properties.permissionPreset.description;
-  assert(description.includes('explicitly selected by the user')); assert(description.includes('Omit to preserve native defaults'));
+  assert(description.includes('signed explicit user grant')); assert(description.includes('Omit to inherit signed Codex launch permissions'));
 });
 
 test('MCP create/send keep the Lead root and never dispatch member fields or message tools', async () => {

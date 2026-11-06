@@ -9,8 +9,6 @@
  */
 import { ClientError } from '../native/errors.mjs';
 
-/** Required, non-defaultable acknowledgement value for secret-bearing disclosure. */
-export const WEB_URL_ACKNOWLEDGEMENT = 'reveal-bearer-credential';
 export const WEB_URL_SCOPE = 'host';
 
 /**
@@ -32,7 +30,7 @@ export const WEB_URL_DISCLOSURE = Object.freeze({
   cookieDefaultLifetimeDays: 30,
   cookieLifetimeNote: 'Upstream default cookieMaxAgeDays is 30 (configurable >= 1), authority-bound with absolute, non-sliding expiry; the actual configured value of this instance is not read by this query.',
   revocation: 'No logout API. Deleting or replacing the client-connection/browser-session credential record revokes cookies at the next Connection activation; clearing a cookie ends only that browser session.',
-  discovery: 'Startup, health, status, result, create and logs never include this URL or its token; only an explicitly acknowledged dsh_team_web_url call returns it.',
+  discovery: 'Startup, health, status, result, create and logs never include this URL or its token; only an explicitly requested dsh_team_web_url call returns it.',
   scopeNote: 'Owned-host homepage root. Upstream 0.2.2-alpha.3 exposes no Team or Session permalink; selecting a Team in Web remains in-app client state.',
 });
 
@@ -42,12 +40,6 @@ function staticError(code, message) {
   error.sanitized = true;
   return error;
 }
-export function requireWebUrlAcknowledgement(value) {
-  if (value !== WEB_URL_ACKNOWLEDGEMENT) {
-    throw staticError('ACKNOWLEDGEMENT_REQUIRED', `Disclosing the authenticated Web URL exposes a bearer credential. Require an explicit user request and pass acknowledge: "${WEB_URL_ACKNOWLEDGEMENT}". No URL was disclosed.`);
-  }
-}
-
 /** Validate the owned host entry and return the exact URL plus its clean loopback origin. */
 export function authenticatedHostEntry(entry) {
   const unavailable = 'The owned host has no authenticated loopback Web entry; no URL was disclosed. This query never starts, adopts or restarts a host.';
@@ -92,7 +84,6 @@ const fixedErrors = {
   PROCESS_UNVERIFIABLE: 'The owned host process identity could not be verified. No URL was disclosed; inspect the dedicated host and retry.',
   UNSAFE_STATE: 'Owned host metadata is unsafe or unreadable. No URL was disclosed; inspect the dedicated Home permissions.',
   WEB_URL_UNAVAILABLE: 'The owned native Web host query did not complete safely; no URL was disclosed. Inspect dsh_team_health and retry.',
-  ACKNOWLEDGEMENT_REQUIRED: 'Disclosing the authenticated Web URL exposes a bearer credential. Require an explicit user request and pass acknowledge: "reveal-bearer-credential". No URL was disclosed.',
   HOST_NOT_RUNNING: 'The owned native Web host is not reachable or no longer attributed. This query never starts, adopts or restarts one; inspect it with dsh_team_health before retrying. No URL was disclosed.',
   INVALID_HOST_ENTRY: 'The owned host entry is not the supported authenticated loopback Web homepage; no URL was disclosed. This query never starts, adopts or restarts a host.',
   OWNERSHIP_MISMATCH: 'The owned host entry or instance record does not match this owned home or runtime. No URL was disclosed; refresh with dsh_team_health.',

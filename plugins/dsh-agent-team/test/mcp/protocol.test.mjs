@@ -64,23 +64,18 @@ test('unknown RPC requests fail without running native work', async () => {
   assert.equal((await dispatch([{ jsonrpc: '2.0', method: 'ping' }])).error.code, -32600);
 });
 
-test('authenticated Web URL disclosure is explicit, schema-gated and mapped without defaults', async () => {
+test('authenticated Web URL query takes only teamId and rejects extra acknowledgement or targets', async () => {
   const calls = [];
-  const dispatch = await initialized({ request: async (method, params) => { calls.push({ method, params }); return { teamId: params.teamId, scope: 'host', url: 'http://127.0.0.1:12345/?token=synthetic-only', origin: 'http://127.0.0.1:12345' }; } });
+  const dispatch = await initialized({ request: async (method, params) => { calls.push({ method, params }); return { scope: 'host', url: 'http://127.0.0.1:12345/?token=synthetic-only' }; } });
   const definition = (await dispatch(rpc('tools/list'))).result.tools.find(tool => tool.name === 'dsh_team_web_url');
-  assert(definition);
-  assert.equal(definition.description.includes('bearer credential'), true);
-  assert.deepEqual(definition.inputSchema.required, ['teamId', 'acknowledge']);
-  assert.deepEqual(definition.inputSchema.properties.acknowledge.enum, ['reveal-bearer-credential']);
-  for (const arguments_ of [{ teamId: 'lead' }, { teamId: 'lead', acknowledge: 'yes' }, { teamId: 'lead', acknowledge: 'reveal-bearer-credential', memberId: 'synthetic-child' }, { acknowledge: 'reveal-bearer-credential' }, { teamId: '', acknowledge: 'reveal-bearer-credential' }]) {
+  assert(definition.description.includes('bearer credential'));
+  assert.deepEqual(definition.inputSchema.required, ['teamId']);
+  assert.deepEqual(Object.keys(definition.inputSchema.properties), ['teamId']);
+  for (const arguments_ of [{}, { teamId: '' }, { teamId: 'lead', acknowledge: 'reveal-bearer-credential' }, { teamId: 'lead', memberId: 'child' }]) {
     assert.equal((await dispatch(rpc('tools/call', { name: 'dsh_team_web_url', arguments: arguments_ }))).error.code, -32602);
   }
   assert.equal(calls.length, 0);
-  const response = await dispatch(rpc('tools/call', { name: 'dsh_team_web_url', arguments: { teamId: 'lead', acknowledge: 'reveal-bearer-credential' } }));
-  assert.deepEqual(calls, [{ method: 'webUrl', params: { teamId: 'lead', acknowledge: 'reveal-bearer-credential' } }]);
+  const response = await dispatch(rpc('tools/call', { name: 'dsh_team_web_url', arguments: { teamId: 'lead' } }));
+  assert.deepEqual(calls, [{ method: 'webUrl', params: { teamId: 'lead' } }]);
   assert.equal(response.result.structuredContent.scope, 'host');
-  // The existing browser handoff tool keeps its unchanged clean-origin contract.
-  const web = tools.find(tool => tool.name === 'dsh_team_web');
-  assert.equal(web.description.includes('Launch tokens and API cookies are never returned'), true);
-  assert.deepEqual(web.inputSchema, { type: 'object', properties: {}, required: [], additionalProperties: false });
 });

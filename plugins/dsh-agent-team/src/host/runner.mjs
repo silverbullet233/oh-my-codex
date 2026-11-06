@@ -11,7 +11,7 @@ process.on('disconnect', () => { if (!started) void removeIf(provisional, config
 await new Promise(resolve => process.once('message', resolve));
 started = true;
 const child = spawn(process.execPath, [config.cli, '--profile', config.profile, '--no-open', '--host', '127.0.0.1', '--port', '0'], {
-  cwd: config.cwd, env: { ...process.env, DSH_HOME: config.home, DSH_OWNED_INSTANCE_ID: config.instanceId }, stdio: ['ignore', 'pipe', 'pipe'],
+  cwd: config.cwd, env: { ...process.env, DSH_HOME: config.home, DSH_OWNED_INSTANCE_ID: config.instanceId, DSH_AGENT_TEAM_LAUNCH_PERMISSION_BINDING: config.permissionBinding }, stdio: ['ignore', 'pipe', 'pipe'],
 });
 const attribution = writePrivate(provisional, { version: 1, birthFormat: 'utc-c-v1', phase: 'child-published', instanceId: config.instanceId, supervisorPid: process.pid, supervisorBirth: birth(process.pid), ...(child.pid ? { pid: child.pid, birth: birth(child.pid) } : {}) });
 const record = join(directory, `ready-${config.instanceId}.json`);
@@ -24,7 +24,7 @@ const deadline = setTimeout(() => { if (!ready) child.kill('SIGTERM'); }, config
 const output = captureNativeOutput(url => {
   if (ready || finished || !birth(child.pid)) return false;
   ready = true; clearTimeout(deadline);
-  publication = attribution.then(() => writePrivate(record, { version: 1, birthFormat: 'utc-c-v1', home: config.home, instanceId: config.instanceId, pid: child.pid, birth: birth(child.pid), supervisorPid: process.pid, url, runtimeAnchor: config.runtimeAnchor, diagnosticsPath })).then(() => {
+  publication = attribution.then(() => writePrivate(record, { version: 1, birthFormat: 'utc-c-v1', home: config.home, instanceId: config.instanceId, pid: child.pid, birth: birth(child.pid), supervisorPid: process.pid, url, runtimeAnchor: config.runtimeAnchor, permissionBinding: config.permissionBinding, diagnosticsPath })).then(() => {
     if (finished) return;
     report({ ready: true }); if (process.connected) process.disconnect();
   }, () => child.kill('SIGTERM'));
