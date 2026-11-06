@@ -99,3 +99,26 @@ test('stop, withdrawal, escalation and observations keep the existing-host-only 
   for (const method of ['stop', 'withdrawInput', 'escalate', 'status', 'pending', 'result']) await owner.request(method, { teamId: 'root' });
   assert.equal(calls, 6);
 });
+
+for (const continued of [false, true]) {
+  for (const source of ['main', 'user']) test(`escalation during admission rechecks ${source} authorization for ${continued ? 'continued' : 'live'} answers`, async t => {
+    const f = await fixture(t, 'answer', continued);
+    const entered = Promise.withResolvers(), release = Promise.withResolvers();
+    f.onStatus(async () => { entered.resolve(); await release.promise; });
+    const params = { ...f.params, source };
+    const response = f.owner.request('answer', params);
+    await entered.promise;
+    f.gateway.interactions.escalate({ ...params, reason: 'User must decide the new scope.' });
+    release.resolve();
+    if (source === 'main') {
+      await assert.rejects(response, { code: 'USER_DECISION_REQUIRED' });
+      assert.equal(f.submitted(), 0);
+      assert.equal(f.gateway.interactions.pending()[0].requiresUser, true);
+      assert.equal(f.gateway.interactions.pending()[0].deliveryId, params.deliveryId);
+      f.onStatus(undefined);
+      assert.equal((await f.owner.request('answer', { ...params, source: 'user' })).submitted, true);
+    } else assert.equal((await response).submitted, true);
+    if (continued) assert.equal(f.submitted(), 1);
+    else assert.deepEqual(await f.delivery, { answers: [{ id: 'scope', selected: ['yes'] }] });
+  });
+}

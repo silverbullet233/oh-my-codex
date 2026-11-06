@@ -118,11 +118,15 @@ export class InteractionQueue {
   async answer(params, beforeSubmit) {
     const row = this.lookup(params, true);
     if (row.kind !== 'question') throw fail('INTERACTION_KIND', 'Use the separate approval decision tool.');
-    if (row.requiresUser && params.source !== 'user') throw fail('USER_DECISION_REQUIRED', 'This question was escalated; obtain the user answer first.');
-    if (!['main', 'user'].includes(params.source)) throw fail('INVALID_ANSWER', 'Identify whether the answer came from main or the user.');
+    this.checkAnswerSource(row, params);
     if (row.state === 'submitted') return this.duplicate(row, params);
     const value = answerBatch(row.payload.questions, params.answers);
     return this.deliver(row, value, params, beforeSubmit);
+  }
+  checkAnswerSource(row, params) {
+    if (row.kind !== 'question') return;
+    if (row.requiresUser && params.source !== 'user') throw fail('USER_DECISION_REQUIRED', 'This question was escalated; obtain the user answer first.');
+    if (!['main', 'user'].includes(params.source)) throw fail('INVALID_ANSWER', 'Identify whether the answer came from main or the user.');
   }
   async deliver(row, value, params, beforeSubmit) {
     if (row.continued) {
@@ -134,6 +138,9 @@ export class InteractionQueue {
       const promise = Promise.resolve().then(async () => {
         await beforeSubmit?.();
         this.lookup(params);
+        // Escalation can occur while admission awaits current permission state.
+        // Keep this check adjacent to the synchronous native submission.
+        this.checkAnswerSource(row, params);
         submitted = true;
         return this.answerContinued(row.agentId, row.correlationId, value);
       });
@@ -150,6 +157,7 @@ export class InteractionQueue {
       await beforeSubmit?.();
       this.lookup(params, true);
       if (row.state === 'submitted') return this.duplicate(row, params);
+      this.checkAnswerSource(row, params);
     }
     return this.submit(row, value, params);
   }
