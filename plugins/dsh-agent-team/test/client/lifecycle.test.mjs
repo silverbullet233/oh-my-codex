@@ -35,6 +35,29 @@ test('synthetic protocol launcher starts the entire host, attributes the actual 
   assert.equal((await fixture.owner.shutdown()).stopped, true);
 });
 
+test('full-access fallback starts and reuses only its captured native source and reason', { timeout: 15000 }, async t => {
+  const fixture = await ownedFixture(t);
+  delete fixture.owner.config.permissionAuthority;
+  delete fixture.owner.config.permissionContext;
+  const health = await fixture.owner.request('health');
+  assert.equal(health.permissionSource.source, 'full-access-fallback');
+  assert.equal(health.permissionSource.fallbackReason, 'sandbox-metadata-unavailable');
+  assert.equal(health.permissionSource.inheritance, 'unavailable');
+  assert.equal(health.execution.source, 'full-access-fallback');
+  assert.equal(health.execution.network, 'unverified');
+  assert.deepEqual(health.host.permissionExecution, health.execution);
+  const created = await fixture.owner.request('create', { key: 'fallback', cwd: fixture.home, text: 'Synthetic fallback policy check.' });
+  assert.equal(created.permissionProfile.sandboxMode, 'danger-full-access');
+  assert.equal(created.permissionProfile.approvalPolicy, 'never');
+  assert.equal(created.permissionProfile.networkAccess, 'unknown');
+  await fixture.owner.request('send', { teamId: created.teamId, inputId: 'same-fallback', text: 'Synthetic continuation.' });
+  const state = { permissionProfile: { type: 'managed' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
+  await assert.rejects(fixture.owner.request('health', {}, { protocolMeta: { 'codex/sandbox-state': state } }), { code: 'HOST_PERMISSION_MISMATCH' });
+  assert.equal(await fixture.starts(), 1);
+  await fixture.owner.request('stop', { teamId: created.teamId });
+  assert.equal((await fixture.owner.shutdown()).stopped, true);
+});
+
 test('sandbox launcher exit without a bootstrap identity keeps uncertain startup and refuses a replacement writer', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   delete fixture.owner.config.permissionAuthority;

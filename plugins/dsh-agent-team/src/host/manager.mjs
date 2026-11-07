@@ -187,6 +187,9 @@ export class OwnedHost {
         const deadline = Date.now() + 4000;
         while (failedRunner.exitCode === null && failedRunner.signalCode === null && Date.now() < deadline) await delay(25);
       }
+      if (context?.sandbox && ['STARTUP_FAILED', 'STARTUP_TIMEOUT'].includes(error.code)) {
+        error.message += ' The supplied Codex sandbox was preserved. DSH startup also needs configuration reads, runtime-state writes, loopback listening and model/control-plane access. Inspect the diagnostics for EPERM/EACCES or network denial; arrange a compatible runtime through the caller before retrying. No writable roots were added and no full-access fallback was attempted.';
+      }
       throw this.withDiagnostics(error, diagnosticsPath);
     }).finally(() => { this.starting = undefined; });
     return this.starting;

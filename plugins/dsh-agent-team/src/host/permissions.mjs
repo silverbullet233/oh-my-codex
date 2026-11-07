@@ -25,14 +25,15 @@ export async function readPermissionContext(config, now = Date.now(), metadata) 
   // or incoming metadata. An environment context path alone also opts into strict mode.
   const strict = config.permissionAuthority !== undefined || config.permissionContext !== undefined;
   const attested = strict ? await readAttestedContext(config, now) : null;
-  const opaque = sandboxContext(metadata);
+  const opaque = sandboxContext(metadata, config);
   if (opaque) {
     if (attested || config.permissionProfile !== undefined) throw new ClientError('PERMISSION_CONTEXT_CONFLICT', 'Sandbox metadata cannot be combined with a separate permission profile or strict attestation. No work was submitted.');
     return opaque;
   }
   if (attested) return attested;
-  let permissions = { sandboxMode: 'read-only', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' };
-  const source = config.permissionProfile === undefined ? 'native-default' : 'explicit-configuration';
+  if (config.permissionProfile === undefined) return fullAccessFallback(config, 'sandbox-metadata-unavailable');
+  let permissions;
+  const source = 'explicit-configuration';
   if (config.permissionProfile !== undefined) {
     try {
       if (!isAbsolute(config.permissionProfile)) fail();
@@ -46,6 +47,19 @@ export async function readPermissionContext(config, now = Date.now(), metadata) 
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
     execution: { backend: 'native', filesystem: 'native-policy', network: 'unverified', approval: 'native-policy' },
     provenance: { source, codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown', signatureVerified: false, osLimitsVerified: false } };
+}
+/** Product default when no supported inheritance channel exists. The native
+ * tuple grants no OS privileges and makes no claim about Codex or networking. */
+function fullAccessFallback(config, reason, unavailableSandbox) {
+  const source = 'full-access-fallback';
+  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' };
+  const binding = { source, fallbackReason: reason, cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions,
+    ...(unavailableSandbox ? { unavailableSandbox } : {}) };
+  return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
+    execution: { backend: 'native', source, fallbackReason: reason, filesystem: 'native-policy', network: 'unverified', approval: 'native-policy' },
+    provenance: { source, fallbackReason: reason, inheritance: 'unavailable', codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown',
+      signatureVerified: false, osLimitsVerified: false,
+      limitations: ['Codex permission inheritance is unavailable; full access is a DSH native policy default.', 'Network access is unknown; outer process and OS restrictions still apply.'] } };
 }
 async function readAttestedContext(config, now) {
   if (!config.permissionAuthority || !config.permissionContext) fail('PERMISSION_CONTEXT_REQUIRED');
@@ -87,24 +101,31 @@ async function readAttestedContext(config, now) {
  * Keep the state opaque; inspecting the profile discriminator is solely an
  * unsupported-boundary check, never a projection of filesystem grants.
  */
-export function sandboxContext(metadata) {
+export function sandboxContext(metadata, config = {}) {
   if (metadata === undefined) return null;
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new ClientError('SANDBOX_METADATA_INVALID', 'Invalid sandbox protocol metadata.');
+  const launcherMeta = metadata['codex/sandbox-launcher'];
+  const launcher = launcherMeta?.codexExecutable;
+  if (launcherMeta !== undefined && (!launcherMeta || typeof launcherMeta !== 'object' || Array.isArray(launcherMeta)
+    || typeof launcher !== 'string' || !isAbsolute(launcher) || launcher.includes('\0'))) throw new ClientError('SANDBOX_LAUNCHER_INVALID', 'The protocol sandbox launcher must be an absolute executable path.');
   const current = metadata['codex/sandbox-state'], legacy = metadata['codex/sandbox-state-meta'];
   if (current === undefined && legacy === undefined) return null;
   if (current !== undefined && legacy !== undefined && !isDeepStrictEqual(current, legacy)) throw new ClientError('SANDBOX_METADATA_CONFLICT', 'Conflicting sandbox state aliases. No work was submitted.');
-  const state = current ?? legacy;
+  const state = current !== undefined ? current : legacy;
   let stateJson, cwd;
   try {
-    if (!state || typeof state !== 'object' || Array.isArray(state)) throw new Error();
+    if (!state || typeof state !== 'object' || Array.isArray(state)
+      || !state.permissionProfile || typeof state.permissionProfile !== 'object' || Array.isArray(state.permissionProfile)
+      || typeof state.permissionProfile.type !== 'string' || !state.permissionProfile.type.length || state.permissionProfile.type.length > 128) throw new Error();
     stateJson = JSON.stringify(state);
     if (Buffer.byteLength(stateJson) > 65536) throw new Error();
     cwd = fileURLToPath(state.sandboxCwd);
     if (!isAbsolute(cwd) || cwd.includes('\0')) throw new Error();
   } catch { throw new ClientError('SANDBOX_METADATA_INVALID', 'Sandbox state must be an opaque JSON object with a native file cwd.'); }
-  const launcher = metadata['codex/sandbox-launcher']?.codexExecutable;
-  if (launcher !== undefined && (typeof launcher !== 'string' || !isAbsolute(launcher) || launcher.includes('\0'))) throw new ClientError('SANDBOX_LAUNCHER_INVALID', 'The protocol sandbox launcher must be an absolute executable path.');
-  const supported = ['managed', 'disabled'].includes(state.permissionProfile?.type);
+  const supported = ['managed', 'disabled'].includes(state.permissionProfile.type);
+  // Capability absence is the only protocol fallback. Never catch an executor,
+  // identity, configuration or OS refusal and retry it with this broader policy.
+  if (!supported || !launcher) return fullAccessFallback({ ...config, cwd }, !supported ? 'sandbox-state-unsupported' : 'sandbox-launcher-unavailable', { stateJson, launcher: launcher ?? null });
   const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' };
   const binding = { source: 'codex-request-metadata', cwd, backend: 'codex-sandbox-host-v1', stateJson, launcher: launcher ?? null, permissions };
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],

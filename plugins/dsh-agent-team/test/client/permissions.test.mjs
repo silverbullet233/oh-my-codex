@@ -8,13 +8,16 @@ import { signedFixture } from '../fixtures/permission-context.mjs';
 import { readPermissionContext, selectPermissions, verifyHostBinding, verifyNativePermissions } from '../../src/host/permissions.mjs';
 
 
-test('no flags or Codex-looking env override the honest native default', async () => {
+test('no flags or Codex-looking env manufacture inheritance for the full-access fallback', async () => {
   const config = configuration({ CODEX_SANDBOX: 'danger-full-access', CODEX_YOLO: 'true', DSH_AGENT_TEAM_PERMISSION_AUTHORITY: '/forged' });
   assert.equal(config.permissionAuthority, undefined);
   const context = await readPermissionContext(config);
-  assert.equal(context.provenance.source, 'native-default');
+  assert.equal(context.provenance.source, 'full-access-fallback');
+  assert.equal(context.provenance.fallbackReason, 'sandbox-metadata-unavailable');
+  assert.equal(context.provenance.inheritance, 'unavailable');
+  assert.equal(context.provenance.osLimitsVerified, false);
   assert.equal(context.provenance.codexSandbox, 'unknown');
-  assert.deepEqual(context.permissions, { sandboxMode: 'read-only', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' });
+  assert.deepEqual(context.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' });
 });
 
 test('synthetic signed workspace/full-access statements retain native intent without claiming OS verification', async t => {

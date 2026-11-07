@@ -8,6 +8,7 @@ import { readPermissionContext, requireExecutableContext, sandboxInvocation, ver
 import { OwnedHost, configuration } from '../../src/host/manager.mjs';
 import { writePrivate } from '../../src/host/files.mjs';
 import { hostInvocation, startupIdentity } from '../../src/host/launch.mjs';
+import { ClientError } from '../../src/native/errors.mjs';
 import { createDispatcher } from '../../src/mcp/server.mjs';
 import { captureNativeOutput } from '../../src/host/output.mjs';
 
@@ -36,10 +37,10 @@ test('protocol capability and full metadata reach client options, detached from 
 test('ordinary unsigned default and explicit configuration are usable native intentions with honest unknowns', async t => {
   const value = await readPermissionContext(configuration({ CODEX_YOLO: 'true', DSH_AGENT_TEAM_PERMISSION_PROFILE: '/ignored' }));
   requireExecutableContext(value);
-  assert.equal(value.provenance.source, 'native-default');
+  assert.equal(value.provenance.source, 'full-access-fallback');
   assert.equal(value.permissions.networkAccess, 'unknown');
   assert.equal(value.provenance.codexApproval, 'unknown');
-  assert.equal(value.permissions.approvalPolicy, 'ask');
+  assert.equal(value.permissions.approvalPolicy, 'never');
   const root = await mkdtemp(join(tmpdir(), 'dsh-config-')); t.after(() => rm(root, { recursive: true, force: true }));
   const path = join(root, 'profile.json');
   const profile = { sandboxMode: 'workspace-write', approvalPolicy: 'never', writableRoots: ['/work'], networkAccess: 'unknown' };
@@ -63,10 +64,10 @@ test('ordinary unsigned default and explicit configuration are usable native int
   }
 });
 
-test('default admission applies read-only ask before first work and verifies current native policy on subsequent input', async () => {
+test('default admission applies full access never before first work and verifies current native policy on subsequent input', async () => {
   const owner = new OwnedHost({ cwd: '/work' }), c = await readPermissionContext(owner.config), calls = [];
   await assert.rejects(owner.request('create', { permissionPreset: 'danger-full-access', permissionAuthorization: 'I approve' }), { code: 'PERMISSION_AUTHORIZATION_REQUIRED' });
-  const profile = { ...c.permissions, binding: c.bindingHash }, permissions = { sandbox: { mode: 'read-only', workspaceRoot: '/work' }, approvalPolicy: 'ask' };
+  const profile = { ...c.permissions, binding: c.bindingHash }, permissions = { sandbox: { mode: 'danger-full-access', workspaceRoot: '/work' }, approvalPolicy: 'never' };
   owner.entry = { permissionBinding: c.bindingHash, permissionExecution: c.execution, url: 'http://127.0.0.1:12345/' };
   owner.ensure = async () => {};
   owner.gateway = { lastHealth: { host: structuredClone(owner.entry) }, request: async (method, params, options) => {
@@ -76,9 +77,9 @@ test('default admission applies read-only ask before first work and verifies cur
   } };
   const created = await owner.request('create', { cwd: '/work', key: 'unsigned', text: 'Synthetic no-signature work' });
   assert.deepEqual(calls[0].params.permissionProfile, profile);
-  assert.equal(created.permissionSource.source, 'native-default');
+  assert.equal(created.permissionSource.source, 'full-access-fallback');
   await owner.request('send', { teamId: 'root', inputId: 'next', text: 'Synthetic follow-up' });
-  permissions.approvalPolicy = 'never';
+  permissions.approvalPolicy = 'ask';
   await assert.rejects(owner.request('send', { teamId: 'root', inputId: 'changed', text: 'Must not run' }), { code: 'PERMISSION_MISMATCH' });
   assert.equal(calls.filter(call => call.method === 'send').length, 1);
 });
@@ -109,24 +110,60 @@ test('opaque state including deny/read/unknown fields reaches exact official arg
   assert.equal(disabled.permissions.approvalPolicy, 'ask');
 });
 
-test('missing launcher and unsupported/external states reject work while health remains observable', async () => {
-  for (const [meta, code] of [
-    [{ 'codex/sandbox-state': state }, 'SANDBOX_LAUNCHER_UNAVAILABLE'],
-    [{ ...metadata, 'codex/sandbox-state': { ...state, permissionProfile: { type: 'external' } } }, 'SANDBOX_STATE_UNSUPPORTED'],
-    [{ ...metadata, 'codex/sandbox-state': { ...state, permissionProfile: { type: 'future' } } }, 'SANDBOX_STATE_UNSUPPORTED'],
+test('unavailable inheritance uses a native full-access fallback with reason and exact startup binding', async () => {
+  for (const [meta, reason] of [
+    [undefined, 'sandbox-metadata-unavailable'],
+    [{ unrelated: true }, 'sandbox-metadata-unavailable'],
+    [{ 'codex/sandbox-state': state }, 'sandbox-launcher-unavailable'],
+    ...['external', 'future'].map(type => [{ ...metadata, 'codex/sandbox-state': { ...state, permissionProfile: { type } } }, 'sandbox-state-unsupported']),
   ]) {
-    const owner = new OwnedHost({});
-    owner.ensure = async () => assert.fail('unsupported work must not reach host startup');
-    const health = await owner.request('health', {}, { protocolMeta: meta });
-    assert.equal(health.limitation.code, code);
-    for (const method of ['create', 'send', 'answer', 'approval', 'web']) await assert.rejects(owner.request(method, {}, { protocolMeta: meta }), { code });
+    const c = await context(meta);
+    requireExecutableContext(c);
+    assert.equal(c.provenance.source, 'full-access-fallback');
+    assert.equal(c.provenance.fallbackReason, reason);
+    assert.equal(c.provenance.inheritance, 'unavailable');
+    assert.equal(c.provenance.osLimitsVerified, false);
+    assert.deepEqual(c.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' });
+    assert.equal(c.sandbox, undefined);
+    assert.equal(c.execution.fallbackReason, reason);
+    const invocation = hostInvocation({ ...c, cli: '/runtime/bin.js', profile: 'web' });
+    assert.equal(invocation.executable, process.execPath);
+    assert.equal(invocation.argv.includes('sandbox'), false);
+    const entry = { permissionBinding: c.bindingHash, permissionExecution: c.execution };
+    verifyHostBinding(entry, c, { host: structuredClone(entry) });
+    assert.throws(() => verifyHostBinding(entry, { ...c, bindingHash: fingerprint({ ...c.binding, source: 'native-default' }) }), { code: 'HOST_PERMISSION_MISMATCH' });
+    assert.throws(() => verifyHostBinding(entry, c, { host: { ...entry, permissionExecution: { backend: 'native' } } }), { code: 'HOST_PERMISSION_MISMATCH' });
+    if (meta?.['codex/sandbox-state']) {
+      assert.equal(c.binding.unavailableSandbox.stateJson, JSON.stringify(meta['codex/sandbox-state']));
+      const changed = await context({ ...meta, 'codex/sandbox-state': { ...meta['codex/sandbox-state'], future: { preserve: false } } });
+      assert.notEqual(changed.bindingHash, c.bindingHash);
+    }
   }
+});
+
+test('available read-only state and OS startup refusal never retry full access or change the supplied state', async () => {
+  const readonlyState = structuredClone(state);
+  readonlyState.permissionProfile.file_system.entries = [{ path: { type: 'path', path: '/work' }, access: 'read' }];
+  const owner = new OwnedHost({}), c = await context({ ...metadata, 'codex/sandbox-state': readonlyState }), failure = new ClientError('STARTUP_FAILED', 'Synthetic EPERM on runtime configuration write.');
+  assert.equal(c.provenance.source, 'codex-request-metadata');
+  assert.equal(c.sandbox.stateJson, JSON.stringify(readonlyState));
+  let starts = 0;
+  owner.locked = async () => { starts++; throw failure; };
+  await assert.rejects(owner.ensure(c), error => error === failure && /runtime-state writes/.test(error.message) && /No writable roots were added/.test(error.message));
+  assert.equal(starts, 1);
+  assert.equal(c.sandbox.stateJson, JSON.stringify(readonlyState));
+  assert.equal(c.permissions.approvalPolicy, 'ask');
 });
 
 test('conflicting aliases and invalid launchers cannot fall back; aliases preserve binding identity', async () => {
   const c = await context(metadata);
   assert.equal((await context({ 'codex/sandbox-state-meta': state, 'codex/sandbox-launcher': metadata['codex/sandbox-launcher'] })).bindingHash, c.bindingHash);
   await assert.rejects(context({ ...metadata, 'codex/sandbox-state-meta': { different: true } }), { code: 'SANDBOX_METADATA_CONFLICT' });
+  for (const broken of [null, [], {}, { ...state, permissionProfile: {} }, { ...state, permissionProfile: null }]) await assert.rejects(context({ ...metadata, 'codex/sandbox-state': broken }), { code: 'SANDBOX_METADATA_INVALID' });
+  for (const broken of [null, [], {}]) {
+    await assert.rejects(context({ ...metadata, 'codex/sandbox-launcher': broken }), { code: 'SANDBOX_LAUNCHER_INVALID' });
+    await assert.rejects(context({ 'codex/sandbox-launcher': broken }), { code: 'SANDBOX_LAUNCHER_INVALID' });
+  }
   for (const codexExecutable of ['codex', '/bad\0path']) await assert.rejects(context({ ...metadata, 'codex/sandbox-launcher': { codexExecutable } }), { code: 'SANDBOX_LAUNCHER_INVALID' });
 });
 

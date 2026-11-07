@@ -63,7 +63,7 @@ test('main/Lead English guidance preserves structured values and original quoted
 
 test('create-time permissions require explicit choice and keep native approval semantics', async () => {
   const skill = await read('skills/dsh-agent-team/SKILL.md');
-  for (const clause of ['Only an explicit user selection', 'native-default', 'Existing/restored Teams verify without rewriting', 'DSH ask does not implement Codex on-request + auto_review', 'osLimitsVerified']) assert(skill.includes(clause));
+  for (const clause of ['Only an explicit user selection', 'full-access-fallback', 'Existing/restored Teams verify without rewriting', 'DSH ask does not implement Codex on-request + auto_review', 'osLimitsVerified']) assert(skill.includes(clause));
   const description = tools.find(tool => tool.name === 'dsh_team_create').inputSchema.properties.permissionPreset.description;
   assert(description.includes('signed explicit user grant')); assert(description.includes('Omit to use the current launch permission source'));
 });

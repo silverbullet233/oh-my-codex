@@ -1,17 +1,21 @@
 # Codex permissions (unreleased candidate)
 
-**Keep this candidate Draft. Full automatic matching of the initiating Codex session, including YOLO approval behavior, is unfinished.** This branch implements the experimental sandbox-state protocol and a whole-host launcher backend. It does not obtain Codex's full approval/reviewer or managed-network configuration. No real initiating-session acceptance has passed.
+**Keep this candidate Draft. Full automatic matching of the initiating Codex session, including YOLO approval behavior, is unfinished.** This branch implements the experimental sandbox-state protocol and a whole-host launcher backend. It does not obtain Codex's full approval/reviewer or managed-network configuration. Real Codex metadata injection has been observed, but no complete initiating-session host/model acceptance has passed.
 
 ## Sources and defaults
 
 | Source | Requested native policy | Execution and remaining unknowns |
 | --- | --- | --- |
-| `native-default` (ordinary install without metadata) | read-only, ask, no writable roots, network unknown | Existing native DSH controls; Codex sandbox/approval/network unknown. Compatible fallback, not inheritance. |
+| `full-access-fallback` (no supported inheritance channel) | danger-full-access, never, no explicit writable roots, network unknown | Product default, not Codex inheritance. Reports `fallbackReason`, `inheritance: unavailable`, and outer OS/process limits. |
 | `explicit-configuration` | Exact private profile selected in user-controlled launch argv | User configuration intent, not detected Codex runtime. Native network enforcement unverified. |
 | `codex-request-metadata` | Native full-access + ask behind the opaque outer sandbox | Entire native host launched with official Codex sandbox state; approval unknown, complete managed-network rules unavailable. |
 | `launcher-attested` (optional strict mode) | Exact signed native tuple | Signature authenticates an external publisher, not OS confinement. |
 
-The native full-access projection for sandbox metadata avoids adding a second, different filesystem policy inside the official boundary. It does not disable that boundary or assert that the caller is YOLO. Managed and disabled opaque states use the same exact launcher path; `disabled` is passed unchanged, while DSH still uses ask because approval is absent from this protocol. `workspace-write + never` does not imply YOLO. No environment YOLO/profile flag changes the conservative default or manufactures a user grant.
+The native full-access projection for sandbox metadata avoids adding a second, different filesystem policy inside the official boundary. It does not disable that boundary or assert that the caller is YOLO. Managed and disabled opaque states use the same exact launcher path; `disabled` is passed unchanged, while DSH still uses ask because approval is absent from this protocol. `workspace-write + never` does not imply YOLO. No environment YOLO/profile flag manufactures inheritance or a user grant. The no-metadata default is full access by product design, independent of those flags. Native `never` denies actions still requiring approval; it is not approve-all.
+
+Fallback is selected only for enumerated capability gaps: `sandbox-metadata-unavailable`, `sandbox-launcher-unavailable`, or `sandbox-state-unsupported` (including external and future state types). It never reconstructs an external boundary. The exact offered state/launcher, when present, remains in the fallback binding, and the captured host execution report includes source and reason. Missing full Codex approval/reviewer or managed-network information alone does not discard an otherwise supported sandbox state: that state still takes priority, with those fields partial/unknown.
+
+Malformed metadata or launcher identity, unequal aliases, conflicting sources, invalid explicit configuration, invalid/expired signatures, binding mismatch and execution/OS denials fail closed. No catch-all converts an error into fallback. In particular, valid read-only metadata remains enforced if host configuration writes fail; startup is never retried with full access. Fallback does not add outer writable roots, change machine security, or prove network access.
 
 Existing runtime/home/role setup is still required. Omitting a signing authority no longer blocks every ordinary operation. Fresh Leads and genuine native Team/delegated children receive their native profile before first work; restored policy is verified without rewriting it. Independent native forks retain their ordinary policy.
 
@@ -51,13 +55,13 @@ All user work originates in that sandboxed host: native filesystem operations (i
 
 This placement intentionally also subjects host configuration reads, durable state writes, loopback listening and model/control-plane networking to the same policy. A typical restricted Codex policy may therefore prevent Web host startup or model requests. The plugin does not widen the state to make them work. No control-plane/user-network split or separate supervisor is implemented. These availability limits are a product gap.
 
-`external` state cannot recreate its producer's outer boundary (the official CLI otherwise degrades it to read-only), so it is rejected. Missing launcher, future/unsupported state, conflicting aliases and invalid paths refuse startup/new work. Health returns a local limitation report without spawning; passive status/stop/withdrawal/escalation can still use an existing attributed host.
+`external` state cannot recreate its producer's outer boundary (the official CLI otherwise degrades it to read-only). It and future state types therefore use an explicitly reported full-access fallback, as does a missing supported launcher. Invalid metadata, conflicting aliases and invalid launcher paths refuse startup/new work. Native restricted-network configuration still returns a local health limitation without spawning; passive status/stop/withdrawal/escalation can use an existing attributed host.
 
 The protocol is experimental. Evidence is pinned to Codex CLI **0.164.0**, official commit `6aaac694803004a63c6f393d153c96d22521a6b9`: [metadata contract](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/codex-mcp/src/sandbox_metadata.rs), [metadata injection](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/mcp_tool_call.rs), [official executor](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/cli/src/debug_sandbox.rs). The executor also loads local configuration. Full approval/reviewer and all managed-network/proxy policy are absent from the state; DSH ask is not Codex on-request + auto_review. These missing fields stay explicitly unknown/partial. Native Web owners retain their existing API authority inside whatever OS boundary actually applies.
 
 ## Reuse and continued work
 
-The entire opaque state, launcher, source, cwd, backend and requested native policy enter the host binding. Retained record and responding health must match; a missing/mismatched identity or boundary refuses new work without upgrading, restarting or stopping the old host. The same tuple alone does not prove identical OS restrictions. A lost metadata channel cannot silently reuse a previously sandbox-bound host through native-default.
+The entire opaque state, launcher, source, cwd, backend and requested native policy enter the host binding. Retained record and responding health must match; a missing/mismatched identity or boundary refuses new work without upgrading, restarting or stopping the old host. The same tuple alone does not prove identical OS restrictions. A lost metadata channel selects a different full-access-fallback binding and cannot reuse a previously sandbox-bound host. Old read-only native-default hosts also mismatch; the plugin never upgrades or replaces them automatically.
 
 Create/send/question answers/all approval replies recheck context after Gateway readiness/reconnection and immediately before native submission. Current native root policy must still match saved Team intent. Continued answers, including continued denials that enqueue work, use the same guard. Failed preflight leaves delivery pending for a legitimate retry. Passive observation, exact withdrawal, escalation and guarded shutdown retain their existing attribution/control paths.
 
@@ -104,7 +108,7 @@ Use current millisecond timestamps; validity is at most 24 hours. The audience p
 `boundaryId` must identify the complete effective boundary, including network allowlists, denied filesystem subpaths, temporary-directory rules and all outer limits not represented by the small permission tuple. Change it whenever any of those restrictions changes. Use canonical physical root paths. This strict channel authenticates publisher statements; `danger-full-access` plus `never` alone does not prove unrestricted network or OS privilege.
 
 
-Strict attestation remains an optional external integration contract. It has no included publisher and is not needed for ordinary installation. Any configured authority/context error fails closed; there is no fallback to native-default. Native restricted network is now rejected because a signature alone does not enforce it. Strict attestation or an explicit profile combined with Codex protocol sandbox state is rejected as a conflicting configuration, rather than ignoring either source.
+Strict attestation remains an optional external integration contract. It has no included publisher and is not needed for ordinary installation. Any configured authority/context error fails closed; there is no fallback to full access. Native restricted network is now rejected because a signature alone does not enforce it. Strict attestation or an explicit profile combined with Codex protocol sandbox state is rejected as a conflicting configuration, rather than ignoring either source.
 
 ## Validation boundaries
 
@@ -127,6 +131,12 @@ Development evidence on 2026-11-06, using `/opt/homebrew/bin/codex` (0.164.0): t
 Context disposal, unchanged protected/private content, absence of blocked output files and temporary-root removal all passed. The request added no reusable approval prefix or persistent policy change. The inner state retained root-read, the one synthetic writable directory, its read-only protected file, its denied private file, restricted network and opaque future fields; no extra roots or sandbox flags were added.
 
 This proves only the exercised synthetic filesystem/shell/descendant boundary through the production launcher/bootstrap. It does **not** establish complete initiating Codex session inheritance, Codex approval/reviewer or YOLO behavior, managed-network/proxy policy, real Web/network behavior, or whole native-host/model/control-plane availability. Those remain **unverified**; keep the change Draft.
+
+## Real-model observations and current fallback validation
+
+The earlier real Codex CLI tools/call observation automatically injected `codex/sandbox-state`, its legacy alias and the local launcher identity, without model-supplied metadata. A separate candidate host attempt reached official DSH 0.2.2-alpha.3 `runCli`, then failed with OS `EPERM` at `prepareProfile` writing `profiles/web/cordis.yml` under a genuinely read-only state. It did not reach model inference. This is a host runtime-state availability failure, not missing inheritable information, and must not trigger fallback or added writable exceptions. Startup errors now explain these runtime/configuration, loopback and control-plane needs and retain the private redacted diagnostics path.
+
+Current regressions check the fallback tuple/reasons, invalid-input refusal, available opaque-state priority, single-attempt startup failure, source/state/cwd/launcher reuse fencing, first Lead/member policy, recursive spawn/fork delegation and cold restoration without rewriting saved policy. These are synthetic protocol and real native data-service tests. They do not certify real YOLO approval/reviewer inheritance, network access, current candidate provider inference or complete host E2E. Both PRs remain Draft.
 
 ## Authenticated Web URL
 
