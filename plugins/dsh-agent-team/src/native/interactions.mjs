@@ -115,37 +115,59 @@ export class InteractionQueue {
     row.requiresUser = true; row.escalation = params.reason; this.changed();
     return { escalated: true, interactionId: row.id, requiresUser: true };
   }
-  async answer(params) {
+  async answer(params, beforeSubmit) {
     const row = this.lookup(params, true);
     if (row.kind !== 'question') throw fail('INTERACTION_KIND', 'Use the separate approval decision tool.');
-    if (row.requiresUser && params.source !== 'user') throw fail('USER_DECISION_REQUIRED', 'This question was escalated; obtain the user answer first.');
-    if (!['main', 'user'].includes(params.source)) throw fail('INVALID_ANSWER', 'Identify whether the answer came from main or the user.');
+    this.checkAnswerSource(row, params);
     if (row.state === 'submitted') return this.duplicate(row, params);
     const value = answerBatch(row.payload.questions, params.answers);
-    return this.deliver(row, value, params);
+    return this.deliver(row, value, params, beforeSubmit);
   }
-  async deliver(row, value, params) {
+  checkAnswerSource(row, params) {
+    if (row.kind !== 'question') return;
+    if (row.requiresUser && params.source !== 'user') throw fail('USER_DECISION_REQUIRED', 'This question was escalated; obtain the user answer first.');
+    if (!['main', 'user'].includes(params.source)) throw fail('INVALID_ANSWER', 'Identify whether the answer came from main or the user.');
+  }
+  async deliver(row, value, params, beforeSubmit) {
     if (row.continued) {
       if (row.answering) {
         if (row.answering.digest !== digest(params)) throw fail('INTERACTION_CONFLICT', 'A different continued reply is already in flight.');
         await row.answering.promise; return this.duplicate(row, params);
       }
-      const promise = Promise.resolve().then(() => this.answerContinued(row.agentId, row.correlationId, value));
+      let submitted = false;
+      const promise = Promise.resolve().then(async () => {
+        await beforeSubmit?.();
+        this.lookup(params);
+        // Escalation can occur while admission awaits current permission state.
+        // Keep this check adjacent to the synchronous native submission.
+        this.checkAnswerSource(row, params);
+        submitted = true;
+        return this.answerContinued(row.agentId, row.correlationId, value);
+      });
       row.answering = { digest: digest(params), promise };
       try {
         const result = await promise;
         if (result !== true) throw fail('STALE_INTERACTION', 'The continued question is no longer answerable.');
-      } catch (error) { this.retire(row, 'uncertain'); throw error; }
+      } catch (error) {
+        if (submitted) this.retire(row, 'uncertain');
+        else row.answering = undefined; // Failed admission did not touch native state.
+        throw error;
+      }
+    } else {
+      await beforeSubmit?.();
+      this.lookup(params, true);
+      if (row.state === 'submitted') return this.duplicate(row, params);
+      this.checkAnswerSource(row, params);
     }
     return this.submit(row, value, params);
   }
-  async approval(params) {
+  async approval(params, beforeSubmit) {
     const row = this.lookup(params, true);
     if (row.kind !== 'approval') throw fail('INTERACTION_KIND', 'This is a question, not an authority event.');
     if (!['approve', 'deny'].includes(params.decision) || (params.decision === 'approve' && !params.authorization?.trim())) throw fail('USER_DECISION_REQUIRED', 'One-shot approval requires explicit user authorization. Omission never grants approval.');
     if (row.state === 'submitted') return this.duplicate(row, params);
     const value = row.source === 'approval' ? (params.decision === 'approve' ? 'allowed-once' : 'rejected') : { answers: [{ id: row.payload.questions[0].id, selected: [row.payload.questions[0].intent[params.decision === 'approve' ? 'approve' : 'reject']] }] };
-    return this.deliver(row, value, params);
+    return this.deliver(row, value, params, beforeSubmit);
   }
   duplicate(row, params) {
     if (row.replyDigest !== digest(params)) throw fail('INTERACTION_CONFLICT', 'This delivery already has a different submitted response.');

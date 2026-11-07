@@ -11,12 +11,12 @@ async function initialized(client) {
   return dispatch;
 }
 
-test('MCP exposes fourteen explicit Session operations and requires initialization', async () => {
+test('MCP exposes eighteen explicit Session operations and requires initialization', async () => {
   const dispatch = createDispatcher({ request: async () => ({}) });
   assert.equal((await dispatch(rpc('tools/list'))).error.code, -32002);
   await dispatch(rpc('initialize', {}));
-  assert.deepEqual((await dispatch(rpc('tools/list'))).result.tools.map((item) => item.name), ['dsh_team_web', 'dsh_team_shutdown', 'dsh_team_health', 'dsh_team_create', 'dsh_team_send', 'dsh_team_status', 'dsh_team_jobs', 'dsh_team_input', 'dsh_team_withdraw_input', 'dsh_team_result', 'dsh_team_turn_result', 'dsh_team_stop', 'dsh_team_pending', 'dsh_team_answer', 'dsh_team_escalate', 'dsh_team_approval', 'dsh_team_wait']);
-  assert.equal(tools.length, 17);
+  assert.deepEqual((await dispatch(rpc('tools/list'))).result.tools.map((item) => item.name), ['dsh_team_web', 'dsh_team_web_url', 'dsh_team_shutdown', 'dsh_team_health', 'dsh_team_create', 'dsh_team_send', 'dsh_team_status', 'dsh_team_jobs', 'dsh_team_input', 'dsh_team_withdraw_input', 'dsh_team_result', 'dsh_team_turn_result', 'dsh_team_stop', 'dsh_team_pending', 'dsh_team_answer', 'dsh_team_escalate', 'dsh_team_approval', 'dsh_team_wait']);
+  assert.equal(tools.length, 18);
   assert.equal(await dispatch({ jsonrpc: '2.0', method: 'notifications/initialized' }), undefined);
 });
 
@@ -62,4 +62,20 @@ test('unknown RPC requests fail without running native work', async () => {
   const dispatch = await initialized({ request: async () => { assert.fail('must not reach bridge'); } });
   assert.equal((await dispatch(rpc('shutdown'))).error.code, -32601);
   assert.equal((await dispatch([{ jsonrpc: '2.0', method: 'ping' }])).error.code, -32600);
+});
+
+test('authenticated Web URL query takes only teamId and rejects extra acknowledgement or targets', async () => {
+  const calls = [];
+  const dispatch = await initialized({ request: async (method, params) => { calls.push({ method, params }); return { scope: 'host', url: 'http://127.0.0.1:12345/?token=synthetic-only' }; } });
+  const definition = (await dispatch(rpc('tools/list'))).result.tools.find(tool => tool.name === 'dsh_team_web_url');
+  assert(definition.description.includes('bearer credential'));
+  assert.deepEqual(definition.inputSchema.required, ['teamId']);
+  assert.deepEqual(Object.keys(definition.inputSchema.properties), ['teamId']);
+  for (const arguments_ of [{}, { teamId: '' }, { teamId: 'lead', acknowledge: 'reveal-bearer-credential' }, { teamId: 'lead', memberId: 'child' }]) {
+    assert.equal((await dispatch(rpc('tools/call', { name: 'dsh_team_web_url', arguments: arguments_ }))).error.code, -32602);
+  }
+  assert.equal(calls.length, 0);
+  const response = await dispatch(rpc('tools/call', { name: 'dsh_team_web_url', arguments: { teamId: 'lead' } }));
+  assert.deepEqual(calls, [{ method: 'webUrl', params: { teamId: 'lead' } }]);
+  assert.equal(response.result.structuredContent.scope, 'host');
 });

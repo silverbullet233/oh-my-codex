@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-team",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Thin Codex MCP client and owned ordinary DSH Web host lifecycle through the native Gateway",
   "type": "module",
   "private": true,
@@ -18,7 +18,8 @@
     "test:unit": "node --test test/mcp/*.test.mjs test/client/*.test.mjs test/package/*.test.mjs",
     "check": "node scripts/check.mjs",
     "build": "node scripts/build.mjs",
-    "pack:check": "npm pack --dry-run --ignore-scripts"
+    "pack:check": "npm pack --dry-run --ignore-scripts",
+    "test:isolated": "node scripts/test-isolated.mjs"
   },
   "files": [
     "src",

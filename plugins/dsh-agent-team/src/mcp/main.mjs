@@ -1,8 +1,14 @@
 #!/usr/bin/env node
-import { OwnedHost } from '../host/manager.mjs';
+import { OwnedHost, configuration } from '../host/manager.mjs';
 import { createDispatcher } from './server.mjs';
 import { createExactRequestClient } from './exact-request.mjs';
-const client = new OwnedHost();
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 2 || !['--permission-authority', '--permission-profile'].includes(args[0]))) throw new Error('Usage: main.mjs [--permission-authority /protected/authority.json | --permission-profile /private/profile.json]');
+const config = configuration(process.env, args[0] === '--permission-authority' ? args[1] : undefined);
+if (args[0] === '--permission-profile') config.permissionProfile = args[1];
+const client = new OwnedHost(config);
+// Public per-process challenge: a signed context from another MCP process is invalid here.
+if (config.permissionAuthority) process.stderr.write(JSON.stringify({ type: 'dsh-permission-challenge', audience: client.config.permissionAudience }) + '\n');
 let requestClient = client;
 if (process.env.DSH_AGENT_TEAM_MCP_REQUEST_POLICY !== undefined) {
   try { requestClient = createExactRequestClient(client, JSON.parse(process.env.DSH_AGENT_TEAM_MCP_REQUEST_POLICY)); }

@@ -9,15 +9,18 @@ const required = ['native-session', 'durable-role-snapshots', 'native-role-setti
 const writes = new Set(['create', 'send', 'stop', 'prepareShutdown', 'withdrawInput']);
 export function verifyHealth(value, entry) {
   if (value?.ok !== true || value.api?.name !== 'dsh-team-roles' || value.api.version !== 1
-    || required.some(name => !value.api.capabilities?.includes(name)) || value.runtime?.packageVersion !== '0.2.2-alpha.2') throw new ClientError('CAPABILITY_MISMATCH', 'The owned host requires dsh-team-roles native API 1 and the exact supported runtime. No work was submitted.');
+    || required.some(name => !value.api.capabilities?.includes(name)) || value.runtime?.packageVersion !== '0.2.2-alpha.3') throw new ClientError('CAPABILITY_MISMATCH', 'The owned host requires dsh-team-roles native API 1 and the exact supported runtime. No work was submitted.');
   if (entry && (value.host?.pid !== entry.pid || value.host?.instanceId !== entry.instanceId || (entry.home && value.host?.home !== entry.home))) throw new ClientError('OWNERSHIP_MISMATCH', 'The responding host is not this client’s attributed instance.');
 }
 /** Disposable authenticated native Node Gateway. It owns no execution state. */
+const interactionModes = new Set(['answer', 'none']);
 export class GatewayClient {
-  constructor({ runtime, entry, timeoutMs = 15000 }) {
-    Object.assign(this, { runtime, entry, timeoutMs, invalid: true });
+  constructor({ runtime, entry, timeoutMs = 15000, interactionMode = 'answer' }) {
+    if (!interactionModes.has(interactionMode)) throw new ClientError('INVALID_INTERACTION_MODE', 'Native client interaction mode must be answer or none.');
+    Object.assign(this, { runtime, entry, timeoutMs, interactionMode, invalid: true });
     this.observation = new NativeObservation(this); this.waiters = new Set(); this.waitLifetime = new AbortController(); this.connectionEpoch = 0; this.projectionSequences = new Map();
-    this.interactions = new InteractionQueue({ instanceId: entry.instanceId,
+    // Passive clients never receive or mutate native interaction delivery.
+    this.interactions = interactionMode === 'none' ? null : new InteractionQueue({ instanceId: entry.instanceId,
       authorize: async (...args) => { await untilAbort(this.readyHealth.promise, args[3]); return this.observation.authority(...args); },
       claimTimed: (...args) => this.observation.claim(...args),
       answerContinued: async (agentId, callId, answer) => {
@@ -26,10 +29,11 @@ export class GatewayClient {
       },
     });
   }
-  healthValue(value) { const pending = this.interactions.pending(); return { ...value, interactionBridge: { mode: 'answer', pendingCount: pending.length, teamIds: [...new Set(pending.map(p => p.teamId))] } }; }
+  healthValue(value) { const pending = this.interactions?.pending() ?? []; return { ...value, interactionBridge: { mode: this.interactionMode, pendingCount: pending.length, teamIds: [...new Set(pending.map(p => p.teamId))] } }; }
   async ready() { if (this.invalid || this.connecting) { this.connecting ??= this.connect().finally(() => { this.connecting = undefined; }); await this.connecting; } }
   wake() { for (const notify of this.waiters) notify(); }
   async refreshPending(teamId, signal) {
+    if (this.interactionMode === 'none') return;
     const ctx = this.ctx;
     let projections;
     try { projections = await this.observation.unary('projections', { sessionId: teamId }, signal); }
@@ -39,7 +43,7 @@ export class GatewayClient {
     if (!Number.isSafeInteger(projections.asOfSeq)) throw new ClientError('INVALID_BASELINE', 'Native projection has no valid sequence cut.');
     if (projections.asOfSeq < (this.projectionSequences.get(teamId) ?? -Infinity)) return;
     this.projectionSequences.set(teamId, projections.asOfSeq);
-    this.interactions.continued(teamId, projections.values.userQuestions?.active);
+    this.interactions?.continued(teamId, projections.values.userQuestions?.active);
   }
   async connect() {
     const epoch = this.connectionEpoch;
@@ -49,7 +53,7 @@ export class GatewayClient {
     const { runtime, entry } = this;
     const launch = new URL(entry.url), origin = launch.origin;
     if (launch.protocol !== 'http:' || launch.hostname !== '127.0.0.1' || !launch.searchParams.get('token')) throw new ClientError('INVALID_HOST_ENTRY', 'Owned host entry is not an authenticated loopback Web origin.');
-    launch.pathname = '/connect'; launch.searchParams.set('interactions', 'answer');
+    launch.pathname = '/connect'; launch.searchParams.set('interactions', this.interactionMode);
     let cookie;
     try {
       const response = await fetch(launch, { redirect: 'manual', signal: AbortSignal.timeout(this.timeoutMs) });
@@ -64,7 +68,7 @@ export class GatewayClient {
     ctx.provide('loader', { await: () => start.promise });
     try {
       await ctx.plugin(runtime.TypertRegistry);
-      runtime.installConnection(ctx, { interactions: 'answer', transport: {
+      runtime.installConnection(ctx, { interactions: this.interactionMode, transport: {
         streamBaseUrl: origin,
         fetch: async (input, init) => {
           const response = await fetch(new URL(input, origin), { ...init, headers: { ...init.headers, Cookie: cookie }, signal: AbortSignal.any([...(init.signal ? [init.signal] : []), AbortSignal.timeout(this.timeoutMs)]) });
@@ -73,7 +77,7 @@ export class GatewayClient {
         },
         createWebSocket: address => {
           const socket = this.socket = new runtime.WebSocket(address, { headers: { Cookie: cookie } });
-          socket.on('close', () => { if (this.ctx === ctx) { this.invalid = true; this.interactions.invalidate(); this.wake(); } });
+          socket.on('close', () => { if (this.ctx === ctx) { this.invalid = true; this.interactions?.invalidate(); this.wake(); } });
           return socket;
         },
       } });
@@ -86,7 +90,7 @@ export class GatewayClient {
         identity: candidate => candidate?.[identity],
         resolve: id => typeof id === 'string' && id.length > 0 && id.length <= 256 ? runtime.ownedValue(ctx.extend({ [identity]: id }), () => {}) : undefined,
       });
-      for (const [event, source] of [['user-questions/request', 'questions'], ['approval/request', 'approval']]) {
+      if (this.interactionMode === 'answer') for (const [event, source] of [['user-questions/request', 'questions'], ['approval/request', 'approval']]) {
         ctx.remote.$on(event, async (request, next) => {
           try { return await this.interactions.receive(source, request.agent?.[identity], request, request.signal); }
           catch (error) { if (error.code === 'INTERACTION_SCOPE' && !request.signal.aborted) return next(); throw error; }
@@ -108,6 +112,9 @@ export class GatewayClient {
     const signal = options.signal ?? new AbortController().signal;
     aborted(signal);
     if (this.waitLifetime.signal.aborted) this.waitLifetime = new AbortController();
+    if (this.interactionMode === 'none' && ['pending', 'answer', 'approval', 'escalate', 'wait'].includes(method)) {
+      throw new ClientError('INTERACTION_DISABLED', 'This passive entry-query client never claims, answers or cancels native interactions.');
+    }
     if (method === 'wait') return waitForTeam(this, params, signal);
     const wasInvalid = this.invalid;
     await untilAbort(this.ready(), signal);
@@ -116,11 +123,12 @@ export class GatewayClient {
     if (method === 'pending') {
       await this.observation.managed(params.teamId, signal);
       await this.refreshPending(params.teamId, signal);
-      return { teamId: params.teamId, interactions: this.interactions.pending(params.teamId) };
+      return { teamId: params.teamId, interactions: this.interactions?.pending(params.teamId) ?? [] };
     }
-    if (method === 'answer') return this.interactions.answer(params);
-    if (method === 'approval') return this.interactions.approval(params);
+    if (method === 'answer') return this.interactions.answer(params, options.beforeSubmit);
+    if (method === 'approval') return this.interactions.approval(params, options.beforeSubmit);
     if (method === 'escalate') return this.interactions.escalate(params);
+    if (method === 'create' && params.permissionProfile && !this.lastHealth.api.capabilities.includes('create-permission-profile')) throw new ClientError('CAPABILITY_MISMATCH', 'This host cannot apply the exact inherited permission profile. No fallback was attempted.');
     if (method === 'create' && params.permissionPreset !== undefined
       && !this.lastHealth.api.capabilities.includes('create-permission-preset')) {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support explicit create-time permission presets. No work was submitted; do not drop the requested preset or fall back.');
@@ -138,8 +146,16 @@ export class GatewayClient {
       throw new ClientError('CAPABILITY_MISMATCH', 'This host does not support live input withdrawal. No queue mutation, cold resume or fallback was attempted.');
     }
     if (method === 'stop') this.wake();
+    // Permission admission must follow connection/reconnection and capability
+    // checks, immediately before the operation that can start native work.
+    await options.beforeSubmit?.();
+    aborted(signal);
     try {
-      const result = await this.ctx.remote.roleTeams[method](params);
+      const operation = this.ctx.remote.roleTeams[method](params);
+      // Passive reads can be abandoned safely. A native response may ignore the
+      // signal or never settle; do not wait for it to finish before cancellation.
+      const result = await (writes.has(method) ? operation : untilAbort(operation, signal));
+      if (!writes.has(method)) aborted(signal);
       if (!result.ok) {
         if (result.error.code?.startsWith('gateway/')) { this.invalid = true; throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain create/input IDs and inspect status before retrying.'); }
         throw new ClientError(result.error.code, result.error.message);
@@ -157,12 +173,13 @@ export class GatewayClient {
       }
       return method === 'health' ? this.healthValue(result.value) : result.value;
     } catch (error) {
+      if (!writes.has(method)) aborted(signal);
       if (error instanceof ClientError) throw error;
       this.invalid = true;
       throw new ClientError(writes.has(method) ? 'OUTCOME_UNCERTAIN' : 'GATEWAY_UNAVAILABLE', 'Native connection failed. Retain IDs; work continues independently and admission may be uncertain.');
     }
   }
-  async disconnect() { this.invalid = true; this.projectionSequences.clear(); this.interactions.invalidate(); this.wake(); const ctx = this.ctx; this.ctx = undefined; await ctx?.fiber.dispose(); }
+  async disconnect() { this.invalid = true; this.projectionSequences.clear(); this.interactions?.invalidate(); this.wake(); const ctx = this.ctx; this.ctx = undefined; await ctx?.fiber.dispose(); }
   async close() {
     this.connectionEpoch++; this.waitLifetime.abort();
     const connecting = this.connecting;

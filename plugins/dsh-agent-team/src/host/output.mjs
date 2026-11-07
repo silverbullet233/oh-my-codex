@@ -32,7 +32,7 @@ export function diagnosticLog(path, instanceId) {
 }
 
 /** stdout and stderr are separate byte streams; only complete native lines can carry readiness. */
-export function captureNativeOutput(onLaunch, onDiagnostic) {
+export function captureNativeOutput(onLaunch, onDiagnostic, onIdentity) {
   const streams = new Map();
   let secret;
   const redact = line => {
@@ -46,6 +46,7 @@ export function captureNativeOutput(onLaunch, onDiagnostic) {
     return text;
   };
   const line = (name, value, complete = true) => {
+    if (complete && onIdentity?.(name, value)) return;
     if (complete && !secret) for (const match of value.replace(/\x1b\[[0-9;]*m/g, '').matchAll(/http:\/\/127\.0\.0\.1:\d+[^\s<>"']*/g)) {
       try {
         const url = new URL(match[0]);
