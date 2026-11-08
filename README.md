@@ -8,6 +8,8 @@ Independent Codex plugins and reusable skills. Each plugin is self-contained und
 
 ## Install in Codex
 
+For an Agent-executable installation workflow with verified published pins, isolated targets, repeat-safety checks and recovery, use [DSH Agent Team installation guide](docs/dsh-agent-team-install.md).
+
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
 **Installation target (unreleased candidate):** catalog **v0.3.1** / plugin **0.4.3** — publication pending; this tag does not exist yet and there are no Release assets. The latest **published** installation remains catalog **v0.3.0** / plugin **0.4.0**, paired with exact DSH `0.2.2-alpha.2` and the published dsh-team-roles 0.6.0 archive; select the published `v0.3.0` tag with the same commands for released installation. Use the candidate pins below only after the candidate release is published and its assets are verified. The earlier catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31**; immutable older tags do not gain these additions.
