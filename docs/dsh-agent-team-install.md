@@ -43,7 +43,8 @@ test ! -e "$dsh_install_root"
 test ! -L "$dsh_install_root"
 mkdir -m 700 "$dsh_install_root"
 mkdir -m 700 "$dsh_install_root/codex-profile" "$dsh_install_root/downloads" "$dsh_install_root/npm-cache" "$dsh_install_root/process-home"
-: > "$dsh_install_root/npmrc"
+: > "$dsh_install_root/npmrc-user"
+: > "$dsh_install_root/npmrc-global"
 
 CODEX_HOME="$dsh_install_root/codex-profile" codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.0 --json
 CODEX_HOME="$dsh_install_root/codex-profile" codex plugin add dsh-agent-team@oh-my-codex --json > "$dsh_install_root/plugin-install.json"
@@ -56,7 +57,7 @@ dsh_plugin_root="$(node --input-type=module -e 'import fs from "node:fs"; const 
 
 ```sh
 env -i PATH="$PATH" HOME="$dsh_install_root/process-home" \
-  npm_config_userconfig="$dsh_install_root/npmrc" npm_config_globalconfig="$dsh_install_root/npmrc" \
+  npm_config_userconfig="$dsh_install_root/npmrc-user" npm_config_globalconfig="$dsh_install_root/npmrc-global" \
   npm_config_cache="$dsh_install_root/npm-cache" \
   npm install --prefix "$dsh_install_root/runtime" @deepseek-ai/dsh@0.2.2-alpha.2 \
   --save-exact --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
@@ -75,7 +76,7 @@ curl -fL --max-time 60 https://github.com/silverbullet233/dsh-team-roles/release
 (cd "$dsh_install_root/downloads" && shasum -a 256 -c SHA256SUMS)
 printf '%s  %s\n' '5538a263d3d2e4f05e843153e524e1501f1564324951a9f21ed6470de5ade67e' "$dsh_install_root/downloads/dsh-team-roles-0.6.0.tgz" | shasum -a 256 -c -
 env -i PATH="$PATH" HOME="$dsh_install_root/process-home" \
-  npm_config_userconfig="$dsh_install_root/npmrc" npm_config_globalconfig="$dsh_install_root/npmrc" \
+  npm_config_userconfig="$dsh_install_root/npmrc-user" npm_config_globalconfig="$dsh_install_root/npmrc-global" \
   npm_config_cache="$dsh_install_root/npm-cache" \
   DSH_AGENT_TEAM_RUNTIME="$DSH_AGENT_TEAM_RUNTIME" DSH_AGENT_TEAM_HOME="$DSH_AGENT_TEAM_HOME" \
   node "$dsh_plugin_root/scripts/setup.mjs" "$dsh_install_root/downloads/dsh-team-roles-0.6.0.tgz" "$dsh_workspace"
