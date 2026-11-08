@@ -2,19 +2,17 @@
 
 Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a **dedicated ordinary DSH Web host**, then connects through the official Node Connection/Typert Gateway. The native host owns role policy, immutable member snapshots, execution, persistence, tools and approvals. The client contains manifests, a skill, native API calls and process lifecycle management.
 
-Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and the published **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)** archive. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this published client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
+Use Node **>=24.9.0**, exact official **DSH / Team Profile 0.2.2-alpha.3**, and the checksum-verified built **[dsh-team-roles 0.6.1](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.1)** archive. Catalog **v0.3.1** maps to plugin **0.4.3**; catalog publication is pending until the reviewed commit is tagged and its workflow/assets are verified. Do not mix these pins with older catalog/runtime/host combinations or install a source archive.
 
-These instructions target the published catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
+The manifest binds runtime/Home using `${PLUGIN_DATA}`. Discover those resolved paths through `codex mcp list --json` in the authorized Codex home before installation. Terminal exports alone do not override MCP's configured paths. See [getting started](docs/getting-started.md).
 
-**Unreleased candidate (catalog 0.3.1 / plugin 0.4.3, this branch):** moves the exact runtime pin to DSH `0.2.2-alpha.3` and requires the matching **unreleased** dsh-team-roles 0.6.1 candidate build; the published 0.6.0 archive supports only `0.2.2-alpha.2`. The candidate is not tagged, has no Release assets and is not published. Validate it only from a locally built plugin in an isolated home; do not claim a release URL, digest or tag for it.
-
-**Unreleased candidate:** DSH Team defaults to native **full access** (`danger-full-access`, approval `never`, network enabled intent). It can modify files outside the project that the host process can access. It does not automatically inherit Codex sandbox/approval/network policy or invoke a Codex launcher. Explicit restricted profiles remain supported and fail closed when invalid or unenforceable. Actual outer OS/process/admin limits still apply; enabled intent is not a connectivity guarantee. See [Team permissions](docs/permissions.md) for configuration and old-host migration. The [historical real-model report](docs/acceptance-2026-11-08.md) applies only to its recorded older hashes. Authenticated URL query: `dsh_team_web_url({teamId})`.
+DSH Team defaults to native **full access** (`danger-full-access`, approval `never`, network enabled intent). It can modify files outside the project that the host process can access. It does not automatically inherit Codex sandbox/approval/network policy or invoke a Codex launcher. Explicit restricted profiles remain supported and fail closed when invalid or unenforceable. Actual outer OS/process/admin limits still apply; enabled intent is not a connectivity guarantee. See [Team permissions](docs/permissions.md). The [historical real-model report](docs/acceptance-2026-11-08.md) applies only to its recorded older hashes.
 
 This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
-For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and explicit MCP environment configuration. The guide and setup safety changes are included from catalog v0.3.0; v0.2.1 keeps its manual installation flow.
+For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It uses the existing setup and manifest-bound persistent plugin data. The guide and setup safety changes are included from catalog v0.3.0; v0.2.1 keeps its manual installation flow.
 
 | CLI method | MCP tool | Purpose |
 | --- | --- | --- |
@@ -39,7 +37,7 @@ From the installed plugin directory, `node scripts/client.mjs health` uses the s
 
 EOF closes only the API Peer. Native work and its host survive. Create keys and input IDs must be reused with identical content after uncertain outcomes; writes are never automatically replayed. Acceptance is separate from processing/completion. Cold or interrupted execution requires explicit continuation. Unknown usage, fees and unloaded selections remain null.
 
-The unpublished 0.4.3 candidate removes the optional cumulative MCP call limit; stale `DSH_AGENT_TEAM_MCP_CALL_LIMIT` values are ignored. Protocol/output sizes and per-operation waits remain. There is no automatic Codex-session-exit stop/pause notification. See [session lifetime evidence](docs/session-lifetime.md) for tested EOF/disconnect/MCP-only signal paths and the limits of claims about actual Codex exit or app crashes.
+Plugin 0.4.3 removes the optional cumulative MCP call limit; stale `DSH_AGENT_TEAM_MCP_CALL_LIMIT` values are ignored. Protocol/output sizes and per-operation waits remain. There is no automatic Codex-session-exit stop/pause notification. See [session lifetime evidence](docs/session-lifetime.md) for tested EOF/disconnect/MCP-only signal paths and the limits of claims about actual Codex exit or app crashes.
 
 Roles and provider authentication are configured in **native Web → Settings → Team roles / Models**. New reservations use current roles; existing members retain snapshots. Empty catalogs use native model inheritance. Inputs are text-only. This plugin changes no Codex model, subscription or ordinary entrypoint.
 
