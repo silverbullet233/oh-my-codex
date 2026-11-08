@@ -4,7 +4,7 @@ Versions here describe the repository catalog. Each plugin has its own version.
 
 ## 0.3.1
 
-Release preparation: catalog **v0.3.1** / plugin **0.4.3**; publication remains pending until the reviewed main commit is tagged and its workflow/assets are verified. Requires published **dsh-team-roles 0.6.1** and exact official **DSH / Team Profile 0.2.2-alpha.3**.
+Published 2026-11-08: catalog **v0.3.1** / plugin **0.4.3** at `7c70e4aeec07fb55b59a28ccdb92c92ac7f3a837`. The official tag workflow, assets/checksums and fixed-tag clean actual-MCP installation passed verification. Requires published **dsh-team-roles 0.6.1** and exact official **DSH / Team Profile 0.2.2-alpha.3**.
 
 - Bind MCP runtime/Home through standard manifest `env` and persistent `${PLUGIN_DATA}` expansion. Existing and isolated Codex home installation guides now discover these resolved paths before setup; terminal DSH exports are unnecessary for MCP. Preserve existing configuration with backups and explicit conflict/recovery checks.
 - Verify installed MCP protocol, identity and all 18 exact named tools, with negative regression controls. The English [installation runbook](docs/dsh-agent-team-install.md) uses fixed catalog/host versions and the actual host release digest.
