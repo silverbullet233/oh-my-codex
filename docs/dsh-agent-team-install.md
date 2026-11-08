@@ -83,6 +83,8 @@ env -i PATH="$PATH" HOME="$dsh_install_root/process-home" \
 
 两个摘要校验都必须成功。不要安装 GitHub 自动生成的源码压缩包，它缺少构建后的 Web 资产。setup 在空专用 Home 安装固定官方 Team Profile 和 host，带 `--ignore-scripts --save-exact`；它不会安装 runtime 或下载资产。完整匹配安装可只读复用；部分失败不会自动回滚。
 
+若固定公开 URL 因网络代理返回 504，可停止当前步骤，使用**已经可用且获授权的** GitHub CLI 在另一个全新下载目录获取同一 Release：`gh release download v0.6.0 --repo silverbullet233/dsh-team-roles --pattern dsh-team-roles-0.6.0.tgz --pattern SHA256SUMS --dir /absolute/new-empty-download-directory`。不发起新登录，不改资产或版本；仍须完成上面两个摘要校验，再将 setup 的 archive 参数指向该验证后的文件。2026-11-08 此命令及下载字节已验证；摘要与上面的固定值一致。
+
 ## 5. 分层校验与 MCP 连接
 
 1. **静态包与 stdio**：用已验证 Node 执行实际安装的 MCP entrypoint，输入 `initialize`（协议 `2025-06-18`）和 `tools/list` 两条 JSON-RPC 请求。检查响应 ID、无 RPC 错误、`serverInfo={name: "dsh-agent-team", version: "0.4.0"}`、协议和工具名称。发布版是 **13 个**工具：`web, shutdown, health, create, send, status, result, stop, pending, answer, escalate, approval, wait`（都带 `dsh_team_` 前缀）。当前候选为 **18 个**，另外包含 `web_url, jobs, input, withdraw_input, turn_result`；数量不能替代精确名称和身份校验。此步骤不调用 host、不创建 Team。
