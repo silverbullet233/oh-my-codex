@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 const text = value => [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text: value }, { type: 'block-end', index: 0, block: { type: 'text', text: value } }, { type: 'finish', reason: { kind: 'stop' } }];
 const calls = entries => [...entries.flatMap(([name, args], index) => [{ type: 'block-start', index, blockType: 'tool-call' }, { type: 'tool-call-delta', index, id: `bounded-${index}`, name, argumentsDelta: JSON.stringify(args) }, { type: 'block-end', index, block: { type: 'tool-call', id: `bounded-${index}`, name, arguments: JSON.stringify(args) } }]), { type: 'finish', reason: { kind: 'tool-calls' } }];
 export default class FixtureCredentials extends CredentialProvider {
-  static inject = ['llm', 'agents', 'tools', 'agentTeams', 'userQuestions', 'approval'];
+  static inject = ['llm', 'agents', 'tools', 'agentTeams', 'userQuestions', 'approval', 'sandboxPolicy'];
   constructor(ctx) {
     super(ctx);
     const child = ctx;
@@ -18,6 +18,7 @@ export default class FixtureCredentials extends CredentialProvider {
           const agent = child.agents.get(options.sessionId);
           if (++requests > 24 || options.provider !== 'fixture-native' || options.model !== 'fixture-model' || agent.session.header.cwd !== resolve(process.env.DSH_HOME, 'fixture')) throw new Error('Bounded synthetic inference refused');
           await appendFile(join(process.env.DSH_HOME, 'synthetic-requests.jsonl'), JSON.stringify({ sessionId: agent.id, provider: options.provider, model: options.model }) + '\n');
+          if (child.approval.overrideOf(agent.session) !== 'never' || child.sandboxPolicy.resolve({ session: agent.session }).mode !== 'danger-full-access') throw new Error('Synthetic request must retain the default full-access policy before work');
           const serialized = JSON.stringify(options.messages);
           const membership = child.agentTeams.tryMembership(agent);
           if (membership?.role === 'lead' && serialized.includes('INTERACTION_BRIDGE') && !interacted.has(agent.id)) {

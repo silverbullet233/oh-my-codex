@@ -61,11 +61,11 @@ test('main/Lead English guidance preserves structured values and original quoted
   }
 });
 
-test('create-time permissions require explicit choice and keep native approval semantics', async () => {
+test('create-time permissions document full access and retain explicit override authorization', async () => {
   const skill = await read('skills/dsh-agent-team/SKILL.md');
-  for (const clause of ['Only an explicit user selection', 'full-access-fallback', 'Existing/restored Teams verify without rewriting', 'DSH ask does not implement Codex on-request + auto_review', 'osLimitsVerified']) assert(skill.includes(clause));
+  for (const clause of ['Only an explicit user selection', 'full-access-default', 'saved policy is verified without rewriting', 'Codex sandbox, approval and network policies are not automatically inherited', 'osLimitsVerified']) assert(skill.includes(clause));
   const description = tools.find(tool => tool.name === 'dsh_team_create').inputSchema.properties.permissionPreset.description;
-  assert(description.includes('signed explicit user grant')); assert(description.includes('Omit to use the current launch permission source'));
+  assert(description.includes('signed explicit user grant')); assert(description.includes('Omit for native full access'));
 });
 
 test('MCP create/send keep the Lead root and never dispatch member fields or message tools', async () => {

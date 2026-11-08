@@ -1,28 +1,25 @@
-# Codex permissions (unreleased candidate)
+# DSH Team permissions (unreleased candidate)
 
-**Only reliably executable filesystem rules are inherited through the experimental state/launcher channel.** Network uses the enabled product default; full Codex approval/reviewer and managed-network inheritance are not claimed. A [scoped real-model acceptance](acceptance-2026-11-08.md) passed automatic metadata → official launcher → host → Lead → model output and cleanup. It does not certify complete initiating-session permissions; merging this implementation does not close those protocol gaps or publish the candidate.
+## Default: full access
 
-## Sources and defaults
+Ordinary startup uses DSH native **full access**, with `source: "full-access-default"`:
 
-**Network defaults to enabled product intent, not inherited Codex network policy.** The plugin adds no separate network restriction. Actual OS/process/network controls and administrator requirements remain effective; enabled intent is not proof of connectivity. The current protocol cannot reliably separate a supplied restricted network from its filesystem rules or identify whether that restriction is administrator-owned. Such a state returns `NETWORK_POLICY_SPLIT_UNAVAILABLE` before host startup/work. It is never rewritten or retried as full access.
-
-| Offered policy/source | Supported behavior |
+| Setting | Default and meaning |
 | --- | --- |
-| Managed state with network enabled and official launcher | Preserve the complete state unchanged, inheriting filesystem rules through the whole-host sandbox. Select network enabled as product default; use native ask, with Codex approval unknown. |
-| Disabled state with official launcher | Pass unchanged; native ask remains a separate product policy, not verified YOLO. |
-| Managed state with restricted/missing/unknown network | Report unsupported separation and stop before startup/work. Preserve the original state; no full-access fallback or guessed projection. |
-| Missing metadata/launcher or unsupported/external state, without a retained incompatible network contract | Explicit `full-access-fallback`: native danger-full-access/never, no explicit writable roots, network enabled product intent, reported capability-gap reason and inheritance unavailable. |
-| Explicit profile / optional strict attestation | Preserve selected native intent and source. Invalid configuration, source conflicts or signatures fail closed; no downgrade. |
+| Filesystem | `danger-full-access`, `writableRoots: []`. DSH adds no project-directory write restriction. Code, shell commands and installed tools can modify files accessible to the host process, including files outside the project. |
+| Approval | `never`. DSH does not prompt for native tool approval; a still-required approval is denied rather than automatically approved. This is not a blanket user approval for independent interactions. |
+| Network | `enabled` requested intent. The plugin adds no network restriction and does not verify actual connectivity. |
+| Execution | Direct native DSH CLI, using the process's existing environment and outer limits. No Codex sandbox launcher or opaque state adapter is used. |
 
-`filesystemSource: codex-request-metadata`, `networkSource: product-default`, `approvalSource: native-default`, `codexApproval: unknown` and `codexNetwork: not-inherited` distinguish the supported portions. `effectiveNetworkVerified`, `signatureVerified` and `osLimitsVerified` remain false. No environment YOLO/profile flag manufactures inheritance or user authorization. Native `never` denies still-required approval; it is not approve-all.
+The plugin **does not automatically inherit Codex sandbox, approval or network policy**. It does not advertise the experimental sandbox-state capability, read/rewrite opaque state, reconstruct policy, or select a fallback based on metadata availability. Old or unsolicited metadata does not change the default, cwd, host binding or explicit launch configuration. `inheritance: "not-requested"` and `codexSandbox`/`codexApproval`/`codexNetwork: "not-inherited"` report that decision. `osLimitsVerified` and `effectiveNetworkVerified` remain false.
 
-Fallback is limited to the enumerated inheritance capability gaps. Known restricted network, unknown network on a managed state, or an unsupported explicit network value is retained and refused even when its launcher is missing or its state type is unsupported. Capability absence never erases these constraints. Unsupported state with no network contract remains an enumerated capability gap, with no claimed filesystem or network inheritance. It does not handle an actual launcher, OS, configuration or identity refusal. Its native full-access default grants no outer OS/network privilege. Original state, source, cwd, launcher, selected native intent and network-default version enter the reuse binding. Changing network intent cannot silently reuse an older host with the same filesystem state; mismatched hosts are retained without automatic restart or upgrade.
+Full access is DSH product policy, not elevated OS privilege. Existing parent-process confinement, filesystem permissions, containers, OS sandboxing, network proxies/allowlists and administrator restrictions still apply. Detachment does not remove those restrictions. An MCP started outside Codex's sandbox does not acquire that sandbox merely because Codex calls it. Actual refusal is returned with redacted startup diagnostics where available; no alternate launcher, added writable root or broader retry is attempted.
 
-Fresh Leads and actual Team/delegated children receive native policy before work. Restored policy is verified without rewriting. Independent native forks keep native behavior. The [historical real-model report](acceptance-2026-11-08.md) predates the current enabled-network intent and applies only to its exact recorded hashes.
+Fresh Leads and actual Team members/delegated children receive the selected native policy before work. Restored Teams verify saved policy without rewriting. Independent native forks retain native behavior. Native API calls without a companion-selected profile retain the host's existing behavior; installing the roles plugin alone does not change every native Session's default.
 
 ## Explicit launch configuration
 
-Create a private, current-user, non-symlink JSON file, then select its **absolute path** in user-controlled MCP launch argv:
+Existing explicit profiles remain supported. Create a private, current-user, non-symlink JSON file and select its absolute path in user-controlled launch argv:
 
 ```json
 {
@@ -38,35 +35,17 @@ node ${PLUGIN_ROOT}/src/mcp/main.mjs --permission-profile /private/profile.json
 node ${PLUGIN_ROOT}/scripts/client.mjs --permission-profile /private/profile.json health
 ```
 
-The profile must use native `ask` or `never`. Workspace-write needs explicit absolute roots matching the host's resolved native roots; read-only/full-access use `[]`. `networkAccess` accepts unknown/enabled/restricted. Unknown is not displayed as disabled network. An explicit restricted network without the official outer backend rejects network-capable work (`NETWORK_ENFORCEMENT_UNAVAILABLE`), including Team admission; it never claims that native DSH enforces a network setter. Invalid explicit configuration is an error, not a default fallback. Profiles only configure fresh Teams; they never rewrite or escalate retained Teams or remove outer process restrictions.
+The source is `explicit-configuration`. Choose `read-only`, `workspace-write` or `danger-full-access`, and native `ask` or `never`. Workspace-write requires absolute roots matching the host's resolved native roots; read-only/full-access require `[]`. This selects native policy rather than proving confinement of every external tool. Network accepts `enabled`, `unknown` or `restricted`; unknown is reported honestly. Native DSH cannot enforce a restricted user-tool network, so explicit `restricted` returns `NETWORK_ENFORCEMENT_UNAVAILABLE` before startup/work, including Team admission. It is never changed to enabled. Missing/invalid files, invalid roots and incompatible settings are errors; none selects the full-access default. Automatic metadata does not override an explicit selection.
 
-## Official sandbox-state protocol and execution
-
-MCP initialize advertises `experimental["codex/sandbox-state"]`. Only `tools/call.params._meta` is forwarded in protocol options, detached from tool arguments. Tool schemas reject attempts to submit metadata as model arguments. The legacy `codex/sandbox-state-meta` alias is accepted; unequal aliases fail. The complete JSON state, including deny/read/temp entries and unknown fields, reaches the launcher unchanged. No reduced native tuple reconstructs it.
-
-The capability-probed local stdio envelope supplies an absolute `codex/sandbox-launcher.codexExecutable`. The exact invocation is:
-
-```text
-<absolute-codex> sandbox --sandbox-state-json <complete-opaque-state> -- <node> <bootstrap> <native-host-args>
-```
-
-No PATH search, extra readable root, socket exception or network override is added to a selected supported sandbox. Actual executor/OS failure never triggers an unsandboxed retry. A bootstrap **inside** the sandbox imports the native CLI and reports its actual host PID before readiness. The existing PID/start-time/runtime/home/nonce and responding-health guards remain required; shutdown targets that attributed host, rather than confusing it with the launcher. If a launcher exits while its attributed host survives, or before bootstrap host identity is confirmed, startup attribution is retained and a second writer is refused. Launcher exit alone never proves descendant exit.
-
-For a supported state, all user work originates in that sandboxed host: native filesystem operations (including direct Web file APIs), shell/terminal execution, Web/network tools, arbitrary installed tools, native Team members and background descendants. The detached runner and MCP connection remain outside it for coordination/diagnostics; they do not execute Team tasks. Detaching does not remove OS restrictions. A matching tuple is not an OS probe. `osLimitsVerified` remains false.
-
-This placement intentionally also subjects host configuration reads, durable state writes, loopback listening and model/control-plane networking to the same policy. A typical restricted Codex policy may therefore prevent Web host startup or model requests. The plugin does not widen the state to make them work. No control-plane/user-network split or separate supervisor is implemented. These availability limits remain a product gap; an actual refusal never selects fallback.
-
-`external` state cannot recreate its producer's outer boundary (the official CLI otherwise degrades it to read-only). It and future state types therefore use an explicitly reported full-access fallback, as does a missing supported launcher. Invalid metadata, conflicting aliases and invalid launcher paths refuse startup/new work. Native restricted-network configuration still returns a local health limitation without spawning; passive status/stop/withdrawal/escalation can use an existing attributed host.
-
-The protocol is experimental. Evidence is pinned to Codex CLI **0.164.0**, official commit `6aaac694803004a63c6f393d153c96d22521a6b9`: [metadata contract](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/codex-mcp/src/sandbox_metadata.rs), [metadata injection](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/mcp_tool_call.rs), [official executor](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/cli/src/debug_sandbox.rs). The executor also loads local configuration. Full approval/reviewer and all managed-network/proxy configuration are absent from the state; DSH ask is not Codex on-request + auto_review. These missing fields stay explicitly unknown/partial. Native Web owners retain their existing API authority inside whatever OS boundary actually applies.
+Profiles apply to fresh Teams. To change a launch policy, initialize a separate dedicated home or explicitly coordinate shutdown of the previous host after its work settles. Do not change global security/network/credential configuration to make startup succeed.
 
 ## Reuse and continued work
 
-The entire opaque state, launcher, source, cwd, backend and requested native policy enter the host binding. Retained record and responding health must match; a missing/mismatched identity or boundary refuses new work without upgrading, restarting or stopping the old host. The same tuple alone does not prove identical OS restrictions. A lost metadata channel selects a different full-access-fallback binding and cannot reuse a previously sandbox-bound host. Old read-only native-default hosts also mismatch; the plugin never upgrades or replaces them automatically.
+Source, cwd, backend and selected native policy enter the host binding. Retained metadata and responding health must match binding and captured execution; PID/start-time, nonce, dedicated home and runtime checks remain required. A matching binding is not an OS-policy probe. Older inherited, fallback, restricted or unknown-boundary hosts are **not** automatically reused, upgraded, restarted or stopped by the new default, even if their native policy tuple happens to match. Uncertain legacy startup attribution is retained; launcher exit alone is not proof of descendant exit.
 
-Create/send/question answers/all approval replies recheck context after Gateway readiness/reconnection and immediately before native submission. Current native root policy must still match saved Team intent. Continued answers, including continued denials that enqueue work, use the same guard. Failed preflight leaves delivery pending for a legitimate retry. Passive observation, exact withdrawal, escalation and guarded shutdown retain their existing attribution/control paths.
+Create/send/question answers/all approval replies recheck configuration after Gateway readiness/reconnection and immediately before submission. Current root policy must match saved Team intent. Continued replies, including denials that enqueue continuation, use the same guards. Failed preflight leaves delivery pending for a legitimate retry. Observation, withdrawal, escalation and guarded shutdown keep their existing attributed-host control paths.
 
-Per-Team `permissionPreset` overrides remain available only with an exact signed external user grant. Model-written explanations are not grants. Ordinary/explicit/metadata sources do not synthesize them. This is not a general mechanism to change an existing Codex session's permissions.
+Per-Team `permissionPreset` overrides still require an exact user grant from the optional signed external authority. Model-written acknowledgements are not grants. Full-access defaults do not remove user-question escalation or one-shot approval authorization.
 
 ## Optional strict attestation
 
@@ -109,42 +88,14 @@ Use current millisecond timestamps; validity is at most 24 hours. The audience p
 `boundaryId` must identify the complete effective boundary, including network allowlists, denied filesystem subpaths, temporary-directory rules and all outer limits not represented by the small permission tuple. Change it whenever any of those restrictions changes. Use canonical physical root paths. This strict channel authenticates publisher statements; `danger-full-access` plus `never` alone does not prove unrestricted network or OS privilege.
 
 
-Strict attestation remains an optional external integration contract. It has no included publisher and is not needed for ordinary installation. Any configured authority/context error fails closed; there is no fallback to full access. Native restricted network is now rejected because a signature alone does not enforce it. Strict attestation or an explicit profile combined with Codex protocol sandbox state is rejected as a conflicting configuration, rather than ignoring either source.
+Strict attestation remains an optional external integration contract. It has no included publisher and is not needed for ordinary installation. Any configured authority/context error fails closed; there is no fallback to full access. Native restricted network is now rejected because a signature alone does not enforce it. Automatic Codex protocol metadata is ignored. Selecting both strict attestation and an explicit profile is a configuration conflict and stops admission.
 
-## Validation boundaries
+## Validation scope and history
 
-Protocol/admission tests exercise actual production modules with synthetic metadata. Native data-service tests exercise first-input/member/restored policy, including unknown network, plus independent-fork and disposal regressions. The CI synthetic launcher lifecycle test checks bootstrap, actual host PID, Gateway health/binding, continuation and guarded shutdown; its launcher deliberately provides no OS sandbox.
+Current automated coverage checks metadata-independent defaults, direct CLI argv/child execution, first-input/native member/delegation policy, cold restoration, explicit restrictions, admission rechecks, old-host rejection and single-attempt errors. Isolated tests use synthetic contexts and native data services; full CI additionally exercises listeners, attributed child lifecycle, Gateway and package installation. These establish the exercised code paths, not actual unrestricted access on every OS or provider/network availability.
 
-The opt-in `scripts/test-codex-boundary.mjs /absolute/codex /absolute/host/repo` uses the real launcher, actual pinned DSH FileSystem and synthetic shell/background descendants without sockets or credentials. It emits each check's `passed`/`failed`/`not-run` status, rejection phase and evidence layer. Native application refusals without an OS error cause are identified separately from `EPERM`/`EACCES`. Unexpected I/O errors, missing reports, launcher failures, unexecuted checks and cleanup failures cannot produce the final `boundary-passed` record. Both context disposal (`ctx.fiber.dispose()`) and temporary-directory cleanup run on failure; cleanup errors remain visible without replacing the primary error. Nineteen no-process fixture regressions cover these paths and run in the isolated gate.
-
-Development evidence on 2026-11-06, using `/opt/homebrew/bin/codex` (0.164.0): the original execution within the outer restricted runtime failed at `sandbox_apply` before bootstrap. A later formally approved single execution reached bootstrap but exposed the probe's incorrect `ctx.dispose()` call, which obscured the primary error. Neither attempt established boundary acceptance. After correcting the lifecycle API and placing path resolution inside rejection assertions, **one new native Codex `require_escalated` request was approved and executed**. The corrected probe and official launcher both exited 0 with these results:
-
-| Check | Result | Observed evidence |
-| --- | --- | --- |
-| Native allowed write | passed | Actual DSH FileSystem write and content readback |
-| Native blocked write | passed | `FS_PERMISSION_DENIED` caused by OS `EPERM` on staging-directory `mkdir` |
-| Native restricted read | passed | OS `EPERM` during `resolve`/`realpath`; `readText` did not execute |
-| Protected Node write | passed | OS `EPERM` on `open` |
-| Allowed shell write | passed | Shell exit 0 and content readback |
-| Background descendant write | passed | Shell `& wait`, exit 0 and content readback |
-| Denied shell write | passed | Shell exit 1, `Operation not permitted` |
-
-Context disposal, unchanged protected/private content, absence of blocked output files and temporary-root removal all passed. The request added no reusable approval prefix or persistent policy change. The inner state retained root-read, the one synthetic writable directory, its read-only protected file, its denied private file, restricted network and opaque future fields; no extra roots or sandbox flags were added.
-
-This proves only the exercised synthetic filesystem/shell/descendant boundary through the production launcher/bootstrap. It does **not** establish complete initiating Codex session inheritance, Codex approval/reviewer or YOLO behavior, managed-network/proxy policy, real Web/network behavior, or whole native-host/model/control-plane availability. Those were **unverified** in that boundary probe. The later [scoped real-model acceptance](acceptance-2026-11-08.md) demonstrates one working host/model configuration; complete permission inheritance remains unverified.
-
-## Real-model observations and current fallback validation
-
-The earlier real Codex CLI tools/call observation automatically injected `codex/sandbox-state`, its legacy alias and the local launcher identity, without model-supplied metadata. A separate candidate host attempt reached official DSH 0.2.2-alpha.3 `runCli`, then failed with OS `EPERM` at `prepareProfile` writing `profiles/web/cordis.yml` under a genuinely read-only state. It did not reach model inference. This is a host runtime-state availability failure, not missing inheritable information, and must not trigger fallback or added writable exceptions. Startup errors now explain these runtime/configuration, loopback and control-plane needs and retain the private redacted diagnostics path.
-
-Current regressions check the fallback tuple/reasons, invalid-input refusal, available opaque-state priority, single-attempt startup failure, source/state/cwd/launcher reuse fencing, first Lead/member policy, recursive spawn/fork delegation and cold restoration without rewriting saved policy. These are synthetic protocol and real native data-service tests. They do not certify real YOLO approval/reviewer inheritance or managed-network policy. Separately, the [2026-11-08 scoped acceptance](acceptance-2026-11-08.md) passed the current candidate host/model path with network enabled. It did not test fallback with a real provider, restricted networking or authenticated-browser UI.
+The [2026-11-08 real-model acceptance](acceptance-2026-11-08.md) is historical: client `b92be5a89829de83cbfe484a045d69c33469e945`, host `5dbea78dd347751cc5730cc8a3ef1f9f44644bd4`, Codex `0.167.0-alpha.3.2`, DSH `0.2.2-alpha.3`. It exercised the former metadata/launcher path, not this full-access default. Earlier boundary probes and read-only startup refusals are recorded in [historical validation](validation.md#historical-validation-through-pr-26). The old launcher/bootstrap and boundary-probe scripts have been removed with the automatic inheritance implementation. No new paid provider call or real bearer URL is required for this iteration, and no such acceptance is claimed. Candidates remain unreleased; merging does not publish a release, tag or npm package.
 
 ## Authenticated Web URL
 
-`dsh_team_web_url({ "teamId": "<managed-root>" })` returns the owned-host authenticated homepage only after explicit user request, never a Team permalink. It never starts a host or opens a browser. The reusable bearer URL grants owner access across the host and may appear in client history; only this successful query may disclose it. Cancellation, including cleanup-phase cancellation, prevents disclosure. Its process lifetime and native browser-cookie lifetime are independent of permission-context expiry. No real bearer URL/token was read during this work.
-
-## Network separation limitation
-
-On official Codex `0.167.0-alpha.3.2` ([fixed source](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/cli/src/lib.rs#L26-L84)), state JSON has only additional-readable-root and disable-network options, no independent enable-network option. The [executor](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/cli/src/debug_sandbox.rs#L190-L323) selects the supplied profile rather than intersecting it again with a config-selected profile. The [opaque-state contract](https://github.com/openai/codex/blob/c40729ea5cf8e947481b130c59807273eda2f8e9/codex-rs/codex-mcp/src/sandbox_metadata.rs#L23-L44) requires unchanged forwarding. A version check alone cannot establish that a restricted field is not an administrator requirement. Consequently this implementation never rewrites that field, reconstructs filesystem grants, or uses a profile that omits management requirements to make network open. Restricted-state separation is a concrete unsupported case, not a passing test.
-
-The optional synthetic filesystem-boundary script now builds network-enabled state to match the current product policy. The older network-restricted probe recorded above belongs to its historical implementation; this change has not rerun it or made a new real network/provider call.
+`dsh_team_web_url({ "teamId": "<managed-root>" })` returns the existing owned-host authenticated homepage only after explicit user request, never a Team permalink. It never starts a host or opens a browser. The reusable bearer URL grants owner access across the host and may appear in client history; only this successful query may disclose it. Cancellation, including cleanup-phase cancellation, prevents disclosure. Process and native browser-cookie lifetimes remain separate from any optional context expiry. Ordinary create/health output stays token-free.

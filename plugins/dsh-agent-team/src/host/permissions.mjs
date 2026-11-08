@@ -1,8 +1,6 @@
-/** Keep native intent, signed statements and opaque protocol state distinct.
- * Neither a declaration nor a signature is an independent OS-policy probe. */
+/** Native policy intent and optional signed statements are not OS-policy probes. */
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { readPrivate } from './files.mjs';
 import { ClientError } from '../native/errors.mjs';
 import { isDeepStrictEqual } from 'node:util';
@@ -20,46 +18,37 @@ export function normalizePermissions(value) {
     || (value.sandboxMode === 'workspace-write' ? value.writableRoots.length === 0 : value.writableRoots.length !== 0)) fail();
   return { sandboxMode: value.sandboxMode, approvalPolicy: value.approvalPolicy === 'on-request' ? 'ask' : 'never', writableRoots: [...new Set(value.writableRoots)].sort(), networkAccess: value.networkAccess };
 }
-export async function readPermissionContext(config, now = Date.now(), metadata) {
+export async function readPermissionContext(config, now = Date.now()) {
   // Configured strict mode is never weakened by a missing file, invalid signature
   // or incoming metadata. An environment context path alone also opts into strict mode.
   const strict = config.permissionAuthority !== undefined || config.permissionContext !== undefined;
-  const attested = strict ? await readAttestedContext(config, now) : null;
-  const opaque = sandboxContext(metadata, config);
-  if (opaque) {
-    if (attested || config.permissionProfile !== undefined) throw new ClientError('PERMISSION_CONTEXT_CONFLICT', 'Sandbox metadata cannot be combined with a separate permission profile or strict attestation. No work was submitted.');
-    return opaque;
-  }
-  if (attested) return attested;
-  if (config.permissionProfile === undefined) return fullAccessFallback(config, 'sandbox-metadata-unavailable');
+  if (strict && config.permissionProfile !== undefined) throw new ClientError('PERMISSION_CONTEXT_CONFLICT', 'Choose either an explicit permission profile or strict attestation. No work was submitted.');
+  if (strict) return readAttestedContext(config, now);
+  if (config.permissionProfile === undefined) return fullAccessDefault(config);
   let permissions;
   const source = 'explicit-configuration';
-  if (config.permissionProfile !== undefined) {
-    try {
-      if (!isAbsolute(config.permissionProfile)) fail();
-      const value = await readPrivate(config.permissionProfile);
-      if (!keys(value, ['sandboxMode', 'approvalPolicy', 'writableRoots', 'networkAccess']) || !['ask', 'never'].includes(value.approvalPolicy)) fail();
-      const native = normalizePermissions({ ...value, approvalPolicy: value.approvalPolicy === 'ask' ? 'on-request' : 'never', networkAccess: value.networkAccess === 'unknown' ? 'enabled' : value.networkAccess });
-      permissions = { ...native, networkAccess: value.networkAccess };
-    } catch { throw new ClientError('PERMISSION_CONFIGURATION_INVALID', 'The explicitly configured private permission profile is invalid. No default fallback was attempted.'); }
-  }
+  try {
+    if (!isAbsolute(config.permissionProfile)) fail();
+    const value = await readPrivate(config.permissionProfile);
+    if (!keys(value, ['sandboxMode', 'approvalPolicy', 'writableRoots', 'networkAccess']) || !['ask', 'never'].includes(value.approvalPolicy)) fail();
+    const native = normalizePermissions({ ...value, approvalPolicy: value.approvalPolicy === 'ask' ? 'on-request' : 'never', networkAccess: value.networkAccess === 'unknown' ? 'enabled' : value.networkAccess });
+    permissions = { ...native, networkAccess: value.networkAccess };
+  } catch { throw new ClientError('PERMISSION_CONFIGURATION_INVALID', 'The explicitly configured private permission profile is invalid. No default fallback was attempted.'); }
   const binding = { source, cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions };
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
     execution: { backend: 'native', filesystem: 'native-policy', network: 'unverified', approval: 'native-policy' },
     provenance: { source, codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown', signatureVerified: false, osLimitsVerified: false } };
 }
-/** Product default when no supported inheritance channel exists. The native
- * tuple grants no OS privileges and makes no claim about Codex or networking. */
-function fullAccessFallback(config, reason, unavailableSandbox) {
-  const source = 'full-access-fallback';
+/** Ordinary product default. This grants no outer OS or network privileges. */
+function fullAccessDefault(config) {
+  const source = 'full-access-default';
   const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'enabled' };
-  const binding = { source, fallbackReason: reason, networkPolicy: 'product-default-open-v1', cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions,
-    ...(unavailableSandbox ? { unavailableSandbox } : {}) };
+  const binding = { source, cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions };
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
-    execution: { backend: 'native', source, fallbackReason: reason, filesystem: 'native-policy', network: 'product-default-open', approval: 'native-policy' },
-    provenance: { source, fallbackReason: reason, inheritance: 'unavailable', codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown',
+    execution: { backend: 'native', source, filesystem: 'native-policy', network: 'product-default-open', approval: 'native-policy' },
+    provenance: { source, inheritance: 'not-requested', codexSandbox: 'not-inherited', codexApproval: 'not-inherited', codexNetwork: 'not-inherited',
       networkSource: 'product-default', effectiveNetworkVerified: false, signatureVerified: false, osLimitsVerified: false,
-      limitations: ['Codex permission inheritance is unavailable; full access is a DSH native policy default.', 'Enabled network is requested product policy, not proof of access; outer process and OS restrictions still apply.'] } };
+      limitations: ['DSH full access is native product policy; Codex permissions are not automatically inherited.', 'Enabled network is requested intent, not proof of access; outer process, OS and administrator restrictions still apply.'] } };
 }
 async function readAttestedContext(config, now) {
   if (!config.permissionAuthority || !config.permissionContext) fail('PERMISSION_CONTEXT_REQUIRED');
@@ -97,61 +86,10 @@ async function readAttestedContext(config, now) {
   }
 }
 
-/** Only tools/call protocol metadata reaches this function, never tool arguments.
- * Keep the state opaque; inspecting the profile discriminator is solely an
- * unsupported-boundary check, never a projection of filesystem grants.
- */
-export function sandboxContext(metadata, config = {}) {
-  if (metadata === undefined) return null;
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new ClientError('SANDBOX_METADATA_INVALID', 'Invalid sandbox protocol metadata.');
-  const launcherMeta = metadata['codex/sandbox-launcher'];
-  const launcher = launcherMeta?.codexExecutable;
-  if (launcherMeta !== undefined && (!launcherMeta || typeof launcherMeta !== 'object' || Array.isArray(launcherMeta)
-    || typeof launcher !== 'string' || !isAbsolute(launcher) || launcher.includes('\0'))) throw new ClientError('SANDBOX_LAUNCHER_INVALID', 'The protocol sandbox launcher must be an absolute executable path.');
-  const current = metadata['codex/sandbox-state'], legacy = metadata['codex/sandbox-state-meta'];
-  if (current === undefined && legacy === undefined) return null;
-  if (current !== undefined && legacy !== undefined && !isDeepStrictEqual(current, legacy)) throw new ClientError('SANDBOX_METADATA_CONFLICT', 'Conflicting sandbox state aliases. No work was submitted.');
-  const state = current !== undefined ? current : legacy;
-  let stateJson, cwd;
-  try {
-    if (!state || typeof state !== 'object' || Array.isArray(state)
-      || !state.permissionProfile || typeof state.permissionProfile !== 'object' || Array.isArray(state.permissionProfile)
-      || typeof state.permissionProfile.type !== 'string' || !state.permissionProfile.type.length || state.permissionProfile.type.length > 128) throw new Error();
-    stateJson = JSON.stringify(state);
-    if (Buffer.byteLength(stateJson) > 65536) throw new Error();
-    cwd = fileURLToPath(state.sandboxCwd);
-    if (!isAbsolute(cwd) || cwd.includes('\0')) throw new Error();
-  } catch { throw new ClientError('SANDBOX_METADATA_INVALID', 'Sandbox state must be an opaque JSON object with a native file cwd.'); }
-  const supported = ['managed', 'disabled'].includes(state.permissionProfile.type);
-  const networkOpenSupported = state.permissionProfile.type === 'disabled' || state.permissionProfile.network === 'enabled';
-  const unsupportedWithoutNetworkContract = !supported && state.permissionProfile.network === undefined;
-  // Known network restrictions survive even capability absence. Never catch an executor,
-  // identity, configuration or OS refusal and retry it with this broader policy.
-  if ((!supported || !launcher) && (networkOpenSupported || unsupportedWithoutNetworkContract)) return fullAccessFallback({ ...config, cwd }, !supported ? 'sandbox-state-unsupported' : 'sandbox-launcher-unavailable', { stateJson, launcher: launcher ?? null });
-  // The opaque network restriction has no trustworthy user/admin origin tag.
-  // Preserve it; do not rewrite it or select another execution path to remove it.
-  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'enabled' };
-  const binding = { source: 'codex-request-metadata', networkPolicy: 'product-default-open-v1', cwd, backend: 'codex-sandbox-host-v1', stateJson, launcher: launcher ?? null, permissions };
-  return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
-    sandbox: { stateJson, launcher, supported, networkOpenSupported },
-    execution: { backend: binding.backend, scope: 'entire-native-host', filesystem: 'launcher-required', network: 'product-default-open', networkOpenSupported, approval: 'native-ask', supported, launcherAvailable: !!launcher },
-    provenance: { source: binding.source, filesystemSource: 'codex-request-metadata', networkSource: 'product-default', approvalSource: 'native-default',
-      codexSandbox: 'opaque', codexApproval: 'unknown', codexNetwork: 'not-inherited', effectiveNetworkVerified: false, signatureVerified: false, osLimitsVerified: false } };
-}
-
 export function requireExecutableContext(context) {
-  if (context.sandbox && !context.sandbox.supported) throw new ClientError('SANDBOX_STATE_UNSUPPORTED', 'External or unsupported sandbox state cannot be recreated locally. Observation remains available; no work was submitted.');
-  if (context.sandbox && !context.sandbox.launcher) throw new ClientError('SANDBOX_LAUNCHER_UNAVAILABLE', 'The caller supplied sandbox state without a supported local launcher. No PATH lookup or native fallback was attempted.');
-  if (context.sandbox && context.sandbox.networkOpenSupported !== true) throw new ClientError('NETWORK_POLICY_SPLIT_UNAVAILABLE', 'The opaque sandbox restricts or does not identify network policy; its user/admin origin cannot be established. The official launcher cannot independently enable network while preserving these filesystem rules and management requirements. The state was preserved; no host, rewritten policy or full-access retry was attempted. Use a compatible caller policy through its authorized configuration.');
-  if (!context.sandbox && context.permissions.networkAccess === 'restricted') throw new ClientError('NETWORK_ENFORCEMENT_UNAVAILABLE', 'Native DSH cannot enforce the requested restricted user-tool network. No work was submitted.');
+  if (context.permissions.networkAccess === 'restricted') throw new ClientError('NETWORK_ENFORCEMENT_UNAVAILABLE', 'Native DSH cannot enforce the requested restricted user-tool network. No work was submitted.');
 }
 
-/** Exact argv, no shell interpolation, extra readable roots or network exceptions. */
-export function sandboxInvocation(context, command) {
-  requireExecutableContext(context);
-  if (!context.sandbox) return { executable: command[0], argv: command.slice(1) };
-  return { executable: context.sandbox.launcher, argv: ['sandbox', '--sandbox-state-json', context.sandbox.stateJson, '--', ...command] };
-}
 export function selectPermissions(context, params) {
   if (params.permissionPreset === undefined && params.permissionAuthorization === undefined) return context.permissions;
   const grant = context.overrides.find(item => item.id === params.permissionAuthorization && item.preset === params.permissionPreset);
@@ -174,5 +112,5 @@ export function verifyHostBinding(entry, context, health) {
 export function verifyNativePermissions(actual, expected) {
   const roots = expected.sandboxMode === 'workspace-write' ? [...new Set([actual?.sandbox?.workspaceRoot, ...(actual?.sandbox?.additionalWritableRoots ?? [])])].sort() : [];
   if (actual?.sandbox?.mode !== expected.sandboxMode || actual?.approvalPolicy !== expected.approvalPolicy
-    || !isDeepStrictEqual(roots, expected.writableRoots)) throw new ClientError('PERMISSION_MISMATCH', 'The native Team policy does not match the signed permission intent. Retain Team/create IDs; no fallback was attempted.');
+    || !isDeepStrictEqual(roots, expected.writableRoots)) throw new ClientError('PERMISSION_MISMATCH', 'The native Team policy does not match the selected permission intent. Retain Team/create IDs; no fallback was attempted.');
 }
