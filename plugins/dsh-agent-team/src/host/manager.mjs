@@ -160,7 +160,7 @@ export class OwnedHost {
         diagnosticsPath = diagnosticPath(this.directory, instanceId);
         await writePrivate(diagnosticsPath, { version: 1, instanceId, text: '' });
         const launchPath = join(this.directory, `launch-${instanceId}.json`);
-        await writePrivate(launchPath, { ...this.config, cwd: context.binding?.cwd ?? this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId, permissionBinding: context.bindingHash, sandbox: context.sandbox, permissionExecution: context.execution });
+        await writePrivate(launchPath, { ...this.config, cwd: context.binding?.cwd ?? this.cwd, cli: this.runtime.cli, runtimeAnchor: this.runtime.anchor, instanceId, permissionBinding: context.bindingHash, permissionExecution: context.execution });
         const runner = spawn(process.execPath, [join(import.meta.dirname, 'runner.mjs'), this.directory, launchPath], { env: process.env, detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
         await writePrivate(join(this.directory, 'starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'spawn-authorized', instanceId, supervisorPid: runner.pid, supervisorBirth: birth(runner.pid) });
         runner.send({ start: true });
@@ -187,9 +187,6 @@ export class OwnedHost {
         const deadline = Date.now() + 4000;
         while (failedRunner.exitCode === null && failedRunner.signalCode === null && Date.now() < deadline) await delay(25);
       }
-      if (context?.sandbox && ['STARTUP_FAILED', 'STARTUP_TIMEOUT'].includes(error.code)) {
-        error.message += ' The supplied Codex sandbox was preserved. DSH startup also needs configuration reads, runtime-state writes, loopback listening and model/control-plane access. Inspect the diagnostics for EPERM/EACCES or network denial; arrange a compatible runtime through the caller before retrying. No writable roots were added and no full-access fallback was attempted.';
-      }
       throw this.withDiagnostics(error, diagnosticsPath);
     }).finally(() => { this.starting = undefined; });
     return this.starting;
@@ -209,7 +206,7 @@ export class OwnedHost {
       // Both ordinary and continued interaction replies can resume execution.
       // Even a denial encoded as a continued question calls userQuestions.answer.
       const admitsWork = ['create', 'send', 'answer', 'approval'].includes(method);
-      const context = allowStart || admitsWork ? await readPermissionContext(this.config, Date.now(), options.protocolMeta) : null;
+      const context = allowStart || admitsWork ? await readPermissionContext(this.config) : null;
       if (context) {
         try { requireExecutableContext(context); }
         catch (error) {
@@ -242,7 +239,7 @@ export class OwnedHost {
           }
           verifyNativePermissions(status.permissions, status.permissionProfile);
         }
-        const fresh = await readPermissionContext(this.config, Date.now(), options.protocolMeta);
+        const fresh = await readPermissionContext(this.config);
         requireExecutableContext(fresh);
         aborted(options.signal);
         if (this.gateway !== gateway || this.entry !== entry) throw new ClientError('HOST_PERMISSION_MISMATCH', 'The attributed host changed during admission. No work was submitted.');

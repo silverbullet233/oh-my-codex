@@ -46,9 +46,15 @@ const until = async check => { const deadline = Date.now() + 15000; while (Date.
 try {
   const health = await owner.request('health'); pid = health.host.pid;
   assert.equal(health.host.home, home); assert.equal(health.owned, true);
+  assert.equal(health.permissionSource.source, 'full-access-default');
+  assert.equal(health.permissionSource.inheritance, 'not-requested');
+  assert.equal(health.execution.backend, 'native');
   const input = { key: 'native-e2e', cwd: workspace, text: 'CREATE_SYNTHETIC_TEAM: process only synthetic fixtures.' };
   const created = await owner.request('create', input); firstId = created.teamId;
   assert.equal(created.sessionId, firstId);
+  assert.equal(created.permissions.sandbox.mode, 'danger-full-access');
+  assert.equal(created.permissions.approvalPolicy, 'never');
+  assert.equal(created.permissionProfile.networkAccess, 'enabled');
   assert.equal((await owner.request('create', input)).teamId, firstId);
   await until(async () => (await owner.request('result', { teamId: firstId })).completed === true);
   const before = await owner.request('status', { teamId: firstId });
@@ -67,8 +73,6 @@ try {
   const question = await until(async () => { const result = await wait(); return result.interactions.find(row => row.kind === 'question'); });
   const identity = row => ({ teamId: row.teamId, interactionId: row.interactionId, deliveryId: row.deliveryId });
   await owner.request('answer', { ...identity(question), source: 'main', answers: [{ id: 'scope', selected: ['existing'] }] });
-  const approval = await until(async () => { const result = await wait(); return result.interactions.find(row => row.kind === 'approval'); });
-  await owner.request('approval', { ...identity(approval), decision: 'deny' });
   await until(async () => (await wait()).reason === 'completed');
   const interactionEvidence = JSON.parse((await readFile(join(home, 'synthetic-interactions.jsonl'), 'utf8')).trim());
   assert.equal(interactionEvidence.agentId, interactionTeam.teamId);
@@ -77,6 +81,7 @@ try {
   if (flags.includes('--open')) await owner.request('web');
   assert.equal((await owner.shutdown()).stopped, true);
   assert.equal(birth(pid), null);
+  assert.notEqual((await owner.request('health')).host.pid, pid);
   const restored = await owner.request('status', { teamId: firstId });
   assert.equal(restored.runtimeState, 'unloaded');
   assert.deepEqual(restored.members.filter(member => member.name !== 'lead').map(member => member.memberId).sort(), childIds);
@@ -84,7 +89,7 @@ try {
   await assert.rejects(access(join(home, '.credentials.yaml')), { code: 'ENOENT' });
   const rows = (await readFile(join(home, 'synthetic-requests.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
   assert(rows.length <= 24);
-  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, leadRootVerified: true, memberSendRejected: true, sameMember: true, interactionBridge: true, nativeWait: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
+  console.log(JSON.stringify({ passed: true, gate: 'real-official-cli-ordinary-web-managed-teams', requests: rows.length, leadRootVerified: true, memberSendRejected: true, sameMember: true, interactionBridge: true, stillRequiredApproval: 'rejected-by-never', permissionSource: 'full-access-default', nativeWait: true, disconnectIndependent: true, restartPersistent: true, persistentCredentialsCreated: false, home }, null, 2));
 } finally {
   await owner.close();
   if (!flags.includes('--keep')) {

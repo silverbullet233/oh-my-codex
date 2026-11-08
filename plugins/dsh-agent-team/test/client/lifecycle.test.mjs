@@ -9,68 +9,45 @@ import { ownedFixture } from '../fixtures/owned.mjs';
 import { OwnedHost, initializeOwnedHome } from '../../src/host/manager.mjs';
 import { readPrivate, writePrivate, birth, delay } from '../../src/host/files.mjs';
 
-test('synthetic protocol launcher starts the entire host, attributes the actual host PID and retains guarded shutdown', { timeout: 15000 }, async t => {
-  // This launcher deliberately does NOT enforce a sandbox. It checks protocol,
-  // argv, bootstrap, native transport, ownership and lifetime mechanics only.
+test('default native full access starts once, ignores automatic metadata and keeps attributed shutdown', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   delete fixture.owner.config.permissionAuthority;
   delete fixture.owner.config.permissionContext;
-  const launcher = join(fixture.home, 'synthetic-launcher');
-  await writeFile(launcher, `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport assert from 'node:assert/strict';\nconst args = process.argv.slice(2); assert.equal(args[0], 'sandbox'); assert.equal(args[1], '--sandbox-state-json'); assert.equal(args[3], '--'); assert.equal(JSON.parse(args[2]).futureField, 'must-survive'); const r = spawnSync(args[4], args.slice(5), { stdio: 'inherit', env: process.env }); process.exit(r.status ?? 1);\n`, { mode: 0o700 });
-  const state = { permissionProfile: { type: 'managed', file_system: { type: 'unrestricted' }, network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href, codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, futureField: 'must-survive' };
-  const options = { protocolMeta: { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: launcher } } };
+  const launcher = join(fixture.home, 'must-not-launch');
+  await writeFile(launcher, `#!${process.execPath}\nprocess.exit(71);\n`, { mode: 0o700 });
+  const options = { protocolMeta: { 'codex/sandbox-state': { permissionProfile: { type: 'managed', network: 'restricted' }, sandboxCwd: 'file:///not-the-host' }, 'codex/sandbox-launcher': { codexExecutable: launcher } } };
   const health = await fixture.owner.request('health', {}, options);
-  assert.equal(health.permissionSource.source, 'codex-request-metadata');
-  assert.equal(health.permissionSource.codexApproval, 'unknown');
-  assert.equal(health.execution.scope, 'entire-native-host');
-  assert.equal(health.host.pid, fixture.owner.entry.pid);
-  assert.equal(birth(health.host.pid), fixture.owner.entry.birth);
-  const created = await fixture.owner.request('create', { key: 'sandbox-protocol', cwd: fixture.home, text: 'synthetic launcher work' }, options);
-  assert.equal(created.permissionProfile.sandboxMode, 'danger-full-access');
-  assert.equal(created.permissions.approvalPolicy, 'ask');
-  await assert.rejects(fixture.owner.request('send', { teamId: created.teamId, inputId: 'metadata-lost', text: 'must not run' }), { code: 'HOST_PERMISSION_MISMATCH' });
-  await fixture.owner.request('send', { teamId: created.teamId, inputId: 'same-state', text: 'synthetic follow-up' }, options);
-  assert.equal(await fixture.starts(), 1);
-  await fixture.owner.request('stop', { teamId: created.teamId });
-  assert.equal((await fixture.owner.shutdown()).stopped, true);
-});
-
-test('full-access fallback starts and reuses only its captured native source and reason', { timeout: 15000 }, async t => {
-  const fixture = await ownedFixture(t);
-  delete fixture.owner.config.permissionAuthority;
-  delete fixture.owner.config.permissionContext;
-  const health = await fixture.owner.request('health');
-  assert.equal(health.permissionSource.source, 'full-access-fallback');
-  assert.equal(health.permissionSource.fallbackReason, 'sandbox-metadata-unavailable');
-  assert.equal(health.permissionSource.inheritance, 'unavailable');
-  assert.equal(health.execution.source, 'full-access-fallback');
+  assert.equal(health.permissionSource.source, 'full-access-default');
+  assert.equal(health.permissionSource.inheritance, 'not-requested');
+  assert.equal(health.execution.source, 'full-access-default');
   assert.equal(health.execution.network, 'product-default-open');
   assert.deepEqual(health.host.permissionExecution, health.execution);
-  const created = await fixture.owner.request('create', { key: 'fallback', cwd: fixture.home, text: 'Synthetic fallback policy check.' });
+  assert.equal(health.host.pid, fixture.owner.entry.pid);
+  assert.equal(birth(health.host.pid), fixture.owner.entry.birth);
+  const created = await fixture.owner.request('create', { key: 'default', cwd: fixture.home, text: 'Synthetic full access policy check.' }, options);
   assert.equal(created.permissionProfile.sandboxMode, 'danger-full-access');
-  assert.equal(created.permissionProfile.approvalPolicy, 'never');
+  assert.equal(created.permissions.approvalPolicy, 'never');
   assert.equal(created.permissionProfile.networkAccess, 'enabled');
-  await fixture.owner.request('send', { teamId: created.teamId, inputId: 'same-fallback', text: 'Synthetic continuation.' });
-  const state = { permissionProfile: { type: 'managed', network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
-  await assert.rejects(fixture.owner.request('health', {}, { protocolMeta: { 'codex/sandbox-state': state } }), { code: 'HOST_PERMISSION_MISMATCH' });
+  await fixture.owner.request('send', { teamId: created.teamId, inputId: 'metadata-absent', text: 'Synthetic continuation.' });
+  assert.equal((await fixture.owner.request('health')).host.pid, health.host.pid);
   assert.equal(await fixture.starts(), 1);
   await fixture.owner.request('stop', { teamId: created.teamId });
   assert.equal((await fixture.owner.shutdown()).stopped, true);
 });
 
-test('sandbox launcher exit without a bootstrap identity keeps uncertain startup and refuses a replacement writer', { timeout: 15000 }, async t => {
+test('legacy launcher attribution with an unconfirmed descendant cannot start a full-access replacement', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   delete fixture.owner.config.permissionAuthority;
   delete fixture.owner.config.permissionContext;
-  const launcher = join(fixture.home, 'synthetic-failed-launcher');
-  await writeFile(launcher, `#!${process.execPath}\nprocess.exit(71);\n`, { mode: 0o700 });
-  const state = { permissionProfile: { type: 'managed', file_system: { type: 'unrestricted' }, network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
-  const options = { protocolMeta: { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: launcher } } };
-  await assert.rejects(fixture.owner.request('health', {}, options), { code: 'STARTUP_FAILED' });
-  const provisional = await readPrivate(join(fixture.home, '.codex-owned/starting.json'));
-  assert.equal(provisional.awaitingSandboxHostIdentity, true);
-  await assert.rejects(fixture.owner.request('health', {}, options), { code: 'STARTUP_UNCERTAIN' });
-  assert.equal(await readPrivate(join(fixture.home, '.codex-owned/instance.json')), null);
+  await fixture.owner.prepare();
+  const { spawnSync } = await import('node:child_process');
+  const exited = spawnSync(process.execPath, ['-e', 'process.exit(71)']);
+  assert.equal(exited.status, 71);
+  await writePrivate(join(fixture.home, '.codex-owned/starting.json'), { version: 1, birthFormat: 'utc-c-v1', phase: 'child-published', instanceId: 'legacy-launcher', awaitingSandboxHostIdentity: true, supervisorPid: process.pid, supervisorBirth: birth(process.pid), pid: exited.pid, birth: 'exited-launcher' });
+  await assert.rejects(fixture.owner.request('health'), { code: 'STARTUP_UNCERTAIN' });
+  assert.equal((await readPrivate(join(fixture.home, '.codex-owned/starting.json'))).awaitingSandboxHostIdentity, true);
+  assert.equal(await fixture.owner.current(), null);
+  await assert.rejects(access(join(fixture.home, 'starts')), { code: 'ENOENT' });
 });
 
 test('cancelled lifecycle requests cannot enter shutdown, startup or browser handoff', async t => {
