@@ -12,7 +12,7 @@ Register the marketplace and install the plugin with a CLI that supports `codex 
 
 **Installation target (unreleased candidate):** catalog **v0.3.1** / plugin **0.4.1** — publication pending; this tag does not exist yet and there are no Release assets. The latest **published** installation remains catalog **v0.3.0** / plugin **0.4.0**, paired with exact DSH `0.2.2-alpha.2` and the published dsh-team-roles 0.6.0 archive; select the published `v0.3.0` tag with the same commands for released installation. Use the candidate pins below only after the candidate release is published and its assets are verified. The earlier catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31**; immutable older tags do not gain these additions.
 
-This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
+This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 ```sh
 codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.1

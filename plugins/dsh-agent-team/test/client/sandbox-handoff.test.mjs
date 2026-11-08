@@ -182,6 +182,64 @@ test('source/cwd/backend/native policy and every opaque field fence retained and
   assert.throws(() => verifyHostBinding(entry, original, { host: { ...entry, permissionExecution: { backend: 'native' } } }), { code: 'HOST_PERMISSION_MISMATCH' });
 });
 
+test('manager refuses retained hosts across fallback capability transitions before connecting or admitting work', async t => {
+  // Keep the real ensure/request path. Only lifecycle I/O is supplied in memory;
+  // this is not process attribution, a listening host or an OS sandbox test.
+  const missing = undefined;
+  const noLauncher = { 'codex/sandbox-state': state };
+  const external = { ...metadata, 'codex/sandbox-state': { ...state, permissionProfile: { type: 'external' } } };
+  const cases = [
+    ['metadata lost', metadata, missing],
+    ['metadata becomes available', missing, metadata],
+    ['fallback reason changes', missing, noLauncher],
+    ['unavailable state changes', noLauncher, { 'codex/sandbox-state': { ...state, future: { preserve: false } } }],
+    ['unsupported state changes', external, { ...external, 'codex/sandbox-state': { ...external['codex/sandbox-state'], future: { preserve: false } } }],
+    ['unsupported launcher changes', external, { ...external, 'codex/sandbox-launcher': { codexExecutable: '/other/codex' } }],
+    ['supported launcher changes', metadata, { ...metadata, 'codex/sandbox-launcher': { codexExecutable: '/other/codex' } }],
+    ['fallback cwd changes', missing, missing, '/other'],
+  ];
+  for (const [name, retainedMeta, offeredMeta, cwd = '/work'] of cases) await t.test(name, async () => {
+    const retained = await readPermissionContext({ cwd: '/work' }, Date.now(), retainedMeta);
+    const entry = { instanceId: 'retained', permissionBinding: retained.bindingHash, permissionExecution: retained.execution };
+    const before = structuredClone(entry);
+    const owner = new OwnedHost({ cwd });
+    owner.locked = action => action();
+    owner.current = async () => entry;
+    owner.pendingStart = async () => assert.fail('a retained host must not trigger startup');
+    owner.createGateway = () => assert.fail('mismatched retained host must not be connected');
+    for (const method of ['health', 'create', 'send']) {
+      await assert.rejects(owner.request(method, {}, { protocolMeta: offeredMeta }), { code: 'HOST_PERMISSION_MISMATCH' });
+      assert.equal(owner.entry, undefined);
+      assert.equal(owner.starting, undefined);
+      assert.deepEqual(entry, before, 'refusal leaves the retained record unchanged');
+    }
+  });
+});
+
+test('manager verifies responding fallback execution before create even with a matching retained binding', async t => {
+  const c = await readPermissionContext({ cwd: '/work' });
+  const entry = { instanceId: 'retained', permissionBinding: c.bindingHash, permissionExecution: c.execution };
+  for (const [name, host] of [
+    ['missing binding', { permissionExecution: c.execution }],
+    ['missing execution', { permissionBinding: c.bindingHash }],
+    ['changed reason', { ...entry, permissionExecution: { ...c.execution, fallbackReason: 'sandbox-launcher-unavailable' } }],
+  ]) await t.test(name, async () => {
+    const owner = new OwnedHost({ cwd: '/work' });
+    owner.locked = action => action();
+    owner.current = async () => entry;
+    const calls = [];
+    owner.createGateway = () => ({ request: async method => {
+      calls.push(method);
+      assert.equal(method, 'health', 'create must not reach native admission');
+      return { host };
+    } });
+    await assert.rejects(owner.request('create', { key: 'blocked', text: 'Synthetic non-admitted work' }), { code: 'HOST_PERMISSION_MISMATCH' });
+    assert.deepEqual(calls, ['health']);
+    assert.equal(entry.permissionBinding, c.bindingHash);
+    assert.deepEqual(entry.permissionExecution, c.execution);
+  });
+});
+
 test('bootstrap attribution accepts one exact stdout identity before readiness, preserves PID guards and omits identity diagnostics', () => {
   const line = JSON.stringify({ type: 'dsh-sandbox-host', instanceId: 'owned', pid: 123 });
   assert.equal(startupIdentity('stdout', line, 'owned'), 123);

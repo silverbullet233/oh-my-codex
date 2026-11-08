@@ -10,7 +10,7 @@ These instructions target the published catalog **v0.3.0** / plugin **0.4.0**. U
 
 **Candidate remains Draft:** the [permission bridge](docs/permissions.md) now accepts experimental Codex sandbox-state and launches the entire native host through the official sandbox. Supported real metadata takes priority. When no supported inheritance channel is available, ordinary installation uses `full-access-fallback`: native danger-full-access + never, with a reported reason and unknown Codex/network fields; signing is optional. Full approval/managed-network matching and real host/model acceptance remain unfinished. A restricted policy can prevent host startup; it is never widened to make startup work. The authenticated URL query is `dsh_team_web_url({teamId})`.
 
-This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
+This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 

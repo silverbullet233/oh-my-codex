@@ -1,6 +1,6 @@
 # Codex permissions (unreleased candidate)
 
-**Keep this candidate Draft. Full automatic matching of the initiating Codex session, including YOLO approval behavior, is unfinished.** This branch implements the experimental sandbox-state protocol and a whole-host launcher backend. It does not obtain Codex's full approval/reviewer or managed-network configuration. Real Codex metadata injection has been observed, but no complete initiating-session host/model acceptance has passed.
+**Full automatic matching of the initiating Codex session, including YOLO approval behavior, is unfinished.** This branch implements the experimental sandbox-state protocol and a whole-host launcher backend. It does not obtain Codex's full approval/reviewer or managed-network configuration. A [scoped real-model acceptance](acceptance-2026-11-08.md) passed automatic metadata → official launcher → host → Lead → model output and cleanup. It does not certify complete initiating-session permissions; merging this implementation does not close those protocol gaps or publish the candidate.
 
 ## Sources and defaults
 
@@ -130,13 +130,13 @@ Development evidence on 2026-11-06, using `/opt/homebrew/bin/codex` (0.164.0): t
 
 Context disposal, unchanged protected/private content, absence of blocked output files and temporary-root removal all passed. The request added no reusable approval prefix or persistent policy change. The inner state retained root-read, the one synthetic writable directory, its read-only protected file, its denied private file, restricted network and opaque future fields; no extra roots or sandbox flags were added.
 
-This proves only the exercised synthetic filesystem/shell/descendant boundary through the production launcher/bootstrap. It does **not** establish complete initiating Codex session inheritance, Codex approval/reviewer or YOLO behavior, managed-network/proxy policy, real Web/network behavior, or whole native-host/model/control-plane availability. Those remain **unverified**; keep the change Draft.
+This proves only the exercised synthetic filesystem/shell/descendant boundary through the production launcher/bootstrap. It does **not** establish complete initiating Codex session inheritance, Codex approval/reviewer or YOLO behavior, managed-network/proxy policy, real Web/network behavior, or whole native-host/model/control-plane availability. Those were **unverified** in that boundary probe. The later [scoped real-model acceptance](acceptance-2026-11-08.md) demonstrates one working host/model configuration; complete permission inheritance remains unverified.
 
 ## Real-model observations and current fallback validation
 
 The earlier real Codex CLI tools/call observation automatically injected `codex/sandbox-state`, its legacy alias and the local launcher identity, without model-supplied metadata. A separate candidate host attempt reached official DSH 0.2.2-alpha.3 `runCli`, then failed with OS `EPERM` at `prepareProfile` writing `profiles/web/cordis.yml` under a genuinely read-only state. It did not reach model inference. This is a host runtime-state availability failure, not missing inheritable information, and must not trigger fallback or added writable exceptions. Startup errors now explain these runtime/configuration, loopback and control-plane needs and retain the private redacted diagnostics path.
 
-Current regressions check the fallback tuple/reasons, invalid-input refusal, available opaque-state priority, single-attempt startup failure, source/state/cwd/launcher reuse fencing, first Lead/member policy, recursive spawn/fork delegation and cold restoration without rewriting saved policy. These are synthetic protocol and real native data-service tests. They do not certify real YOLO approval/reviewer inheritance, network access, current candidate provider inference or complete host E2E. Both PRs remain Draft.
+Current regressions check the fallback tuple/reasons, invalid-input refusal, available opaque-state priority, single-attempt startup failure, source/state/cwd/launcher reuse fencing, first Lead/member policy, recursive spawn/fork delegation and cold restoration without rewriting saved policy. These are synthetic protocol and real native data-service tests. They do not certify real YOLO approval/reviewer inheritance or managed-network policy. Separately, the [2026-11-08 scoped acceptance](acceptance-2026-11-08.md) passed the current candidate host/model path with network enabled. It did not test fallback with a real provider, restricted networking or authenticated-browser UI.
 
 ## Authenticated Web URL
 
