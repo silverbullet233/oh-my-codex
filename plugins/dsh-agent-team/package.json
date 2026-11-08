@@ -1,6 +1,6 @@
 {
   "name": "dsh-agent-team",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Thin Codex MCP client and owned ordinary DSH Web host lifecycle through the native Gateway",
   "type": "module",
   "private": true,
