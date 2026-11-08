@@ -42,6 +42,10 @@ test('nested source, built folder and isolated tarball resolve MCP tools and ret
     await access(join(directory, 'docs/bootstrap.md'));
     assert.equal(typeof (await import(pathToFileURL(join(directory, 'scripts/setup.mjs')).href)).setup, 'function');
     const config = JSON.parse(await readFile(join(directory, 'mcp.json'), 'utf8')).mcpServers['dsh-agent-team'];
+    assert.deepEqual(config.env, {
+      DSH_AGENT_TEAM_RUNTIME: '${PLUGIN_DATA}/runtime/node_modules/@deepseek-ai/dsh',
+      DSH_AGENT_TEAM_HOME: '${PLUGIN_DATA}/dsh-home',
+    });
     const expand = value => value.replaceAll('${PLUGIN_ROOT}', directory);
     assert.equal(expand(config.cwd), directory);
     const output = await run(config.command, config.args.map(expand), {

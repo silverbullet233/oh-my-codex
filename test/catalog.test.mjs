@@ -59,3 +59,16 @@ test('normal installation guides pin the catalog version and versioned host rele
   assert.equal(new Set(assets.map(row => row[1])).size, 1);
   assert(!guide.includes('releases/latest/'));
 });
+
+test('agent guide selects an authorized home and preserves existing-profile boundaries', async () => {
+  const guide = await readFile(join(root, 'docs/dsh-agent-team-install.md'), 'utf8');
+  assert(guide.includes('dsh_codex_home=\'/absolute/existing/authorized-codex-home\''));
+  assert(guide.includes('# dsh_codex_home="$dsh_install_root/codex-profile"'));
+  assert(!guide.includes('CODEX_HOME="$dsh_install_root/codex-profile"'));
+  assert(guide.includes('profile-backup/config.toml'));
+  assert(guide.includes('Do not restore the entire configuration backup'));
+  assert(guide.includes('actual MCP integration blocked by missing environment forwarding'));
+  assert(guide.includes('No working desktop-specific override is claimed here'));
+  assert(guide.includes('Do not copy authentication'));
+  assert(guide.includes('dsh_team_health'));
+});

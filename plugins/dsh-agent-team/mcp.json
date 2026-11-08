@@ -5,7 +5,11 @@
       "type": "stdio",
       "command": "node",
       "args": ["${PLUGIN_ROOT}/src/mcp/main.mjs"],
-      "cwd": "${PLUGIN_ROOT}"
+      "cwd": "${PLUGIN_ROOT}",
+      "env": {
+        "DSH_AGENT_TEAM_RUNTIME": "${PLUGIN_DATA}/runtime/node_modules/@deepseek-ai/dsh",
+        "DSH_AGENT_TEAM_HOME": "${PLUGIN_DATA}/dsh-home"
+      }
     }
   }
 }
