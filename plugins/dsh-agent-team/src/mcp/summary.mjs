@@ -1,5 +1,8 @@
 /** Opt-in MCP presentation budget; native reads and legacy full results are unchanged. */
 export const SUMMARY_BYTES = 16384;
+/** Retained native error sample presentation limits; reducing them is a budget decision, never native clipping. */
+export const ERROR_SAMPLE_LIMIT = 2;
+export const ERROR_PREVIEW_BYTES = 256;
 const integer = value => Number.isSafeInteger(value) ? value : null;
 const boolean = value => typeof value === 'boolean' ? value : null;
 // Opaque IDs/options must never be made into different identifiers by clipping.
@@ -30,6 +33,22 @@ function preview(value, limit) {
   let end = Math.min(limit, bytes.length);
   while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
   return { text: bytes.subarray(0, end).toString('utf8'), available: true, previewTruncated: end < bytes.length || prefix.length < value.length, originalWellFormed: value.isWellFormed() };
+}
+
+/** Retained root-session error history is historical context; the client does not infer turn attribution. */
+function retainedErrors(value) {
+  // Retained history may contain both current-turn and earlier errors. Native sequence
+  // identity is preserved, but sequence placement is never converted into a turn claim.
+  const shared = { scope: 'root-session-retained-history', attribution: 'not-inferred', currentTurnAttribution: null,
+    goalOutcomeInferred: false, samplePolicy: 'most-recent-retained', sampleLimit: ERROR_SAMPLE_LIMIT, previewBytes: ERROR_PREVIEW_BYTES };
+  if (!Array.isArray(value)) return { ...shared, available: false, reason: 'not-provided-or-unsupported-format', retainedCount: null, samples: [], omittedSamples: null };
+  // The native projection appends oldest→newest and retains at most eight entries,
+  // so the most recent sample is its bounded tail shown in retained order.
+  const rows = value.slice(-ERROR_SAMPLE_LIMIT);
+  return { ...shared, available: true, retainedCount: value.length,
+    samples: rows.map(row => { const sample = preview(row?.message, ERROR_PREVIEW_BYTES);
+      return { seq: integer(row?.seq), message: sample.text, messageAvailable: sample.available, previewTruncated: sample.previewTruncated, originalWellFormed: sample.originalWellFormed }; }),
+    omittedSamples: Math.max(0, value.length - rows.length) };
 }
 
 function cut(value) {
@@ -90,6 +109,7 @@ export function boundedObservation(method, value, request = {}) {
     completionScope: method === 'status' ? 'native-team-only' : result?.execution ? 'native-team-and-observed-owned-jobs' : 'legacy-native-result',
     execution: execution(result?.execution),
     toolActivity: toolActivity(source?.toolActivity),
+    retainedErrors: retainedErrors(errors),
     sourceCuts: { status: cut(status), result: cut(result) }, turns: turns(result?.turns ?? (observation ? { latestStarted: { turn: observation.turn, startSeq: observation.turnStartSeq }, active: observation.open === true ? observation.turn : null, lastEnded: observation.lastEnd, lastCompleted: observation.lastCompletedTurn } : null)),
     output: { ...preview(text, 2048), source: outputSource ? { turn: integer(outputSource.turn), seq: integer(outputSource.seq), truncated: boolean(outputSource.truncated) } : null },
     latestAssistant: latestAssistant ? { turn: integer(latestAssistant.turn), seq: integer(latestAssistant.seq), hasText: boolean(latestAssistant.hasText) } : null,
@@ -115,6 +135,14 @@ export function boundedObservation(method, value, request = {}) {
       value.projections = []; value.omittedProjections = list(original?.freshness?.projections)?.length ?? null;
     }
     resultBody = wrap(summary);
+    if (size(resultBody) > SUMMARY_BYTES && summary.retainedErrors.available && summary.retainedErrors.samples.length) {
+      // Retained error previews are the last sampled detail dropped so a valid summary can
+      // still fit the fixed budget; the omission stays explicit instead of falling back to full.
+      summary.retainedErrors.samplesOmittedForBudget = summary.retainedErrors.samples.length;
+      summary.retainedErrors.samples = [];
+      summary.retainedErrors.omittedSamples = summary.retainedErrors.retainedCount;
+      resultBody = wrap(summary);
+    }
   }
   if (size(resultBody) > SUMMARY_BYTES) throw Object.assign(new Error('Observation summary exceeds its fixed presentation budget; no full payload fallback was returned.'), { code: 'SUMMARY_LIMIT' });
   return resultBody;
