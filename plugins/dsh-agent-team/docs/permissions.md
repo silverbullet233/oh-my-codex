@@ -1,4 +1,4 @@
-# DSH Team permissions (unreleased candidate)
+# DSH Team permissions (plugin 0.4.3)
 
 ## Default: full access
 
@@ -94,7 +94,7 @@ Strict attestation remains an optional external integration contract. It has no 
 
 Current automated coverage checks metadata-independent defaults, direct CLI argv/child execution, first-input/native member/delegation policy, cold restoration, explicit restrictions, admission rechecks, old-host rejection and single-attempt errors. Isolated tests use synthetic contexts and native data services; full CI additionally exercises listeners, attributed child lifecycle, Gateway and package installation. These establish the exercised code paths, not actual unrestricted access on every OS or provider/network availability.
 
-The [2026-11-08 real-model acceptance](acceptance-2026-11-08.md) is historical: client `b92be5a89829de83cbfe484a045d69c33469e945`, host `5dbea78dd347751cc5730cc8a3ef1f9f44644bd4`, Codex `0.167.0-alpha.3.2`, DSH `0.2.2-alpha.3`. It exercised the former metadata/launcher path, not this full-access default. Earlier boundary probes and read-only startup refusals are recorded in [historical validation](validation.md#historical-validation-through-pr-26). The old launcher/bootstrap and boundary-probe scripts have been removed with the automatic inheritance implementation. No new paid provider call or real bearer URL is required for this iteration, and no such acceptance is claimed. Candidates remain unreleased; merging does not publish a release, tag or npm package.
+The [2026-11-08 real-model acceptance](acceptance-2026-11-08.md) is historical: client `b92be5a89829de83cbfe484a045d69c33469e945`, host `5dbea78dd347751cc5730cc8a3ef1f9f44644bd4`, Codex `0.167.0-alpha.3.2`, DSH `0.2.2-alpha.3`. It exercised the former metadata/launcher path, not this full-access default. Earlier boundary probes and read-only startup refusals are recorded in [historical validation](validation.md#historical-validation-through-pr-26). The old launcher/bootstrap and boundary-probe scripts have been removed with the automatic inheritance implementation. No new paid provider call or real bearer URL is required for this iteration, and no such acceptance is claimed. Host 0.6.1 is published with exact DSH 0.2.2-alpha.3; catalog 0.3.1 / plugin 0.4.3 publication remains pending until its reviewed tag workflow and assets are verified. npm publication remains separate.
 
 ## Authenticated Web URL
 

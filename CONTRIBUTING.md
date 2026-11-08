@@ -42,7 +42,7 @@ These operations were verified with Codex CLI 0.164.0. This optional check uses 
 - Bump the affected plugin version when its installed content changes. A catalog-only change can leave plugin versions unchanged. Codex 0.164.0 refreshed changed content under an unchanged plugin version in our fixture, but published versions should still identify immutable content.
 - Bump the catalog version for each catalog snapshot release. Use patch for compatible corrections, minor for compatible additions and major for breaking installation/catalog changes; during 0.x, document any breaking changes explicitly.
 - Add one `## X.Y.Z` entry to `CHANGELOG.md`. Tag, root version, lock and changelog must agree. Never move a published tag or replace an asset.
-- The current branch carries an **unreleased candidate** (catalog 0.3.1 / plugin 0.4.3, runtime DSH 0.2.2-alpha.3, requiring the matching unreleased dsh-team-roles 0.6.1 candidate). It is **not tagged, has no GitHub Release assets and is not published to npm**; the published installation pins remain catalog v0.3.0 / plugin 0.4.0 with DSH 0.2.2-alpha.2. Publication is a separate maintainer decision after the documented checks pass on the tagged default-branch commit and a compatible host release exists and is verified first.
+- Release target: **catalog 0.3.1 / plugin 0.4.3**, exact official **DSH / Team Profile 0.2.2-alpha.3** and published **dsh-team-roles 0.6.1**. The Host assets are verified; catalog publication remains pending until the reviewed default-branch commit is tagged and its workflow/assets are verified. GitHub Release and npm publication remain separate.
 
 ## Prepare a release locally
 
@@ -62,7 +62,7 @@ Run the same install/build sequence before each preparation: npm normalizes work
 
 Output:
 
-- Plugin tarballs, currently `dsh-agent-team-0.4.3.tgz` for the unreleased candidate.
+- Plugin tarballs, currently `dsh-agent-team-0.4.3.tgz` for the 0.3.1 release target.
 - `catalog.json`: catalog/tag/commit and independent plugin versions with repository-relative paths.
 - `release-notes.md`: changelog, version mapping and tagged marketplace instructions.
 - `SHA256SUMS`: SHA-256 hashes for the archives, catalog and notes.
