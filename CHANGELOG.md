@@ -6,6 +6,8 @@ Versions here describe the repository catalog. Each plugin has its own version.
 
 Publication pending: this catalog/plugin candidate is **not tagged**, has **no GitHub Release assets** and is **not published**. The latest published installation pins remain catalog **v0.3.0** / plugin **0.4.0**.
 
+- Repair the isolated Codex installation check after the explicit authenticated Web URL query expanded the current MCP surface from 17 to 18 tools. Validate exact named tools, negotiated protocol and server identity instead of a count alone; add negative regression cases and an Agent-facing [published installation runbook](docs/dsh-agent-team-install.md). Plugin package bytes and published pins are unchanged.
+
 - DSH Agent Team 0.4.3 removes the optional cumulative MCP call budget (`DSH_AGENT_TEAM_MCP_CALL_LIMIT`); stale environment values are ignored. Summary/input size and per-operation transport/observation bounds remain. EOF and MCP-only signal tests document independent host lifetime; no automatic session-exit stop/pause mechanism is added. See [lifetime evidence](plugins/dsh-agent-team/docs/session-lifetime.md). This is still the unpublished catalog 0.3.1 candidate.
 - Candidate runtime pin moves to exact DSH `0.2.2-alpha.3` with the corresponding Cordis-layer `*.alpha.2` sub-line (`@deepseek-ai/cordis@4.0.6-alpha.2`). Published catalog v0.3.0 / plugin 0.4.0 remains on DSH `0.2.2-alpha.2`.
 - DSH Agent Team 0.4.3 candidate requires the matching **unreleased dsh-team-roles 0.6.1 candidate build**; the published dsh-team-roles 0.6.0 archive supports only DSH `0.2.2-alpha.2`. A compatible host release must be published and verified before this candidate can be released.

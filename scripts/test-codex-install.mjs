@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { assertInstalledMcp, installProtocolVersion } from './install-mcp-contract.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const directory = await mkdtemp(join(tmpdir(), 'codex-catalog-install-'));
@@ -75,11 +76,13 @@ try {
     assert(installed.installedPath.startsWith(`${await realpath(home)}/`));
     const mcp = JSON.parse(await readFile(join(installed.installedPath, 'mcp.json'), 'utf8')).mcpServers['dsh-agent-team'];
     const expand = value => value.replaceAll('${PLUGIN_ROOT}', installed.installedPath);
-    const messages = [{ jsonrpc: '2.0', id: 1, method: 'initialize' }, { jsonrpc: '2.0', id: 2, method: 'tools/list' }].map(row => JSON.stringify(row)).join('\n') + '\n';
+    const messages = [{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: installProtocolVersion } }, { jsonrpc: '2.0', id: 2, method: 'tools/list' }].map(row => JSON.stringify(row)).join('\n') + '\n';
     const smoke = spawnSync(mcp.command, mcp.args.map(expand), { cwd: directory, env: { PATH: process.env.PATH }, input: messages, encoding: 'utf8', timeout: 10_000 });
     assert.equal(smoke.status, 0, smoke.stderr);
-    assert.equal(JSON.parse(smoke.stdout.trim().split('\n')[1]).result.tools.length, 17);
-    observed.push({ ...snapshot, mcpTools: JSON.parse(smoke.stdout.trim().split('\n')[1]).result.tools.length });
+    // Snapshot metadata versions above are synthetic upgrade fixtures. The copied
+    // server bytes retain the current source identity, independently checked here.
+    const toolNames = assertInstalledMcp(smoke.stdout, { name: pkg.name, version: pkg.version });
+    observed.push({ ...snapshot, mcpTools: toolNames.length, toolNames });
   }
   cli(['remove', 'dsh-agent-team@oh-my-codex']);
   cli(['marketplace', 'remove', 'oh-my-codex']);
