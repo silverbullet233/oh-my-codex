@@ -12,7 +12,7 @@ For an Agent-executable installation workflow with verified published pins, isol
 
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
-**Release target:** catalog **v0.3.1** / plugin **0.4.3**, paired with exact official DSH / Team Profile **0.2.2-alpha.3** and **[dsh-team-roles 0.6.1](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.1)**. Catalog publication is pending until the reviewed main commit is tagged, its workflow succeeds and its assets are verified. Before installing, verify the fixed Release and tag using the installation guide. Older tags retain their original contents.
+**Published release:** catalog **v0.3.1** / plugin **0.4.3**, paired with exact official DSH / Team Profile **0.2.2-alpha.3** and **[dsh-team-roles 0.6.1](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.1)**. Published on 2026-11-08 from reviewed commit `7c70e4aeec07fb55b59a28ccdb92c92ac7f3a837`; the official tag workflow, public assets and fixed-tag clean actual-MCP installation passed verification. Before installing, verify the fixed Release and tag using the installation guide. Older tags retain their original contents.
 This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 ```sh

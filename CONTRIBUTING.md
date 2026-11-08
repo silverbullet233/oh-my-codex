@@ -42,7 +42,7 @@ These operations were verified with Codex CLI 0.164.0. This optional check uses 
 - Bump the affected plugin version when its installed content changes. A catalog-only change can leave plugin versions unchanged. Codex 0.164.0 refreshed changed content under an unchanged plugin version in our fixture, but published versions should still identify immutable content.
 - Bump the catalog version for each catalog snapshot release. Use patch for compatible corrections, minor for compatible additions and major for breaking installation/catalog changes; during 0.x, document any breaking changes explicitly.
 - Add one `## X.Y.Z` entry to `CHANGELOG.md`. Tag, root version, lock and changelog must agree. Never move a published tag or replace an asset.
-- Release target: **catalog 0.3.1 / plugin 0.4.3**, exact official **DSH / Team Profile 0.2.2-alpha.3** and published **dsh-team-roles 0.6.1**. The Host assets are verified; catalog publication remains pending until the reviewed default-branch commit is tagged and its workflow/assets are verified. GitHub Release and npm publication remain separate.
+- Published release: **catalog 0.3.1 / plugin 0.4.3**, exact official **DSH / Team Profile 0.2.2-alpha.3** and published **dsh-team-roles 0.6.1**. Both releases, their immutable tag/commit mappings, public assets and the fixed-tag clean actual-MCP installation were verified on 2026-11-08; see [release validation](docs/release-0.3.1-validation.md). GitHub Release and npm publication remain separate.
 
 ## Prepare a release locally
 
