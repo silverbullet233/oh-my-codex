@@ -1,6 +1,6 @@
 # Activated orchestration contract
 
-**Version scope:** the published contract targets catalog **v0.3.0** / plugin **0.4.0**, with host **0.6.0** and exact runtime **`0.2.2-alpha.2`**. The unreleased candidate on this branch targets catalog **0.3.1** / plugin **0.4.2** with exact runtime **`0.2.2-alpha.3`** and the matching unreleased dsh-team-roles 0.6.1 candidate; it is not tagged, has no Release assets and is not published. The earlier v0.2.1 / plugin 0.3.2 tag was published on 2026-10-31 and does not gain these additions.
+**Version scope:** the published contract targets catalog **v0.3.0** / plugin **0.4.0**, with host **0.6.0** and exact runtime **`0.2.2-alpha.2`**. The unreleased candidate on this branch targets catalog **0.3.1** / plugin **0.4.3** with exact runtime **`0.2.2-alpha.3`** and the matching unreleased dsh-team-roles 0.6.1 candidate; it is not tagged, has no Release assets and is not published. The earlier v0.2.1 / plugin 0.3.2 tag was published on 2026-10-31 and does not gain these additions.
 
 Activation is explicit: ask Codex to use DSH Agent Team for the work. Merely discussing/updating the plugin does not activate it, and other Codex workflows remain unchanged.
 
@@ -31,7 +31,7 @@ The actual official-CLI acceptance gate checks that the returned root is the nat
 
 This skill is behavioral guidance. It does not remove Codex's other tools, create a global sandbox or install a Codex session tool whitelist. Native role creation guards control DSH role execution, not Codex main. The ordinary authenticated native Web/Gateway may offer broader capabilities to users; their access is unchanged. Codex must not use Web, direct Session calls, scripts or another tool to bypass the Lead-only workflow. While Codex controls the Team, Web observation/settings are supported; Web messages or answering forwarded prompts/approvals are unsupported concurrent interaction. No client arbitration is added; users retain native controls. A rostered member authority event may be decided through the separate explicit approval tool; it does not expose member task instructions.
 
-Host dsh-team-roles 0.6.0 supplies the managed root API boundary, but does not install or globally enforce this Codex behavior. The installed candidate 0.4.2 skill supplies the opt-in contract. Future releases must preserve the distinction between behavioral guidance, exposed API validation and any separately verified tool enforcement.
+Host dsh-team-roles 0.6.0 supplies the managed root API boundary, but does not install or globally enforce this Codex behavior. The installed candidate 0.4.3 skill supplies the opt-in contract. Future releases must preserve the distinction between behavioral guidance, exposed API validation and any separately verified tool enforcement.
 
 ## Create-time permissions
 

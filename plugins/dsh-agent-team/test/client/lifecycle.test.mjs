@@ -110,6 +110,21 @@ test('mux closure invalidates authentication and obtains a fresh API Peer before
   assert.equal(await fixture.starts(), 1);
 });
 
+test('active synthetic work survives Gateway disconnect and explicit client close', async t => {
+  const fixture = await ownedFixture(t);
+  const teamId = 'active-disconnect';
+  await fixture.owner.request('create', { key: teamId, cwd: fixture.home, text: 'hang' });
+  const pid = (await fixture.owner.request('health')).host.pid;
+  const socket = fixture.owner.gateway.socket;
+  const disconnected = once(socket, 'close'); socket.close(); await disconnected;
+  assert.equal((await fixture.owner.request('status', { teamId })).runtimeState, 'running');
+  await fixture.owner.close();
+  assert.equal((await fixture.owner.request('status', { teamId })).runtimeState, 'running');
+  assert.equal((await fixture.owner.request('result', { teamId })).completed, false);
+  assert.equal((await fixture.owner.request('health')).host.pid, pid);
+  assert.equal(await fixture.starts(), 1);
+});
+
 test('failed startup removes its lock and leaves no live attributed host; a later clean start succeeds', { timeout: 15000 }, async t => {
   const fixture = await ownedFixture(t);
   const cli = join(fixture.runtime, 'lib/bin.js');

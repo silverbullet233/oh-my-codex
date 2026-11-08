@@ -4,6 +4,8 @@ import { assertNativeDiagnostics } from '../fixtures/diagnostics.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createInterface } from 'node:readline';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, delimiter } from 'node:path';
@@ -43,6 +45,62 @@ test('stdio EOF preserves its owned native host and a new MCP process reconnects
     assert.doesNotMatch(result.stdout + result.stderr, /token=|Cookie|DSH_OWNED_INSTANCE_ID/);
   }
   assert.equal(await fixture.starts(), 1);
+});
+
+test('retired MCP call-limit settings cannot block work, reads or stop', async t => {
+  const fixture = await ownedFixture(t);
+  for (const value of ['1', 'invalid']) {
+    const teamId = `retired-limit-${value}`;
+    const lines = [
+      { jsonrpc: '2.0', id: 1, method: 'initialize' },
+      ...[
+        ['create', { key: teamId, cwd: fixture.home, text: 'hang' }],
+        ['status', { teamId }], ['result', { teamId }], ['stop', { teamId }], ['status', { teamId }],
+      ].map(([name, args], index) => ({ jsonrpc: '2.0', id: index + 2, method: 'tools/call', params: { name: `dsh_team_${name}`, arguments: args } })),
+    ].map(row => JSON.stringify(row)).join('\n') + '\n';
+    const result = await run({ ...fixture.env, DSH_AGENT_TEAM_MCP_CALL_LIMIT: value }, lines, fixture);
+    assert.equal(result.code, 0, result.stderr); assertNativeDiagnostics(result.stderr);
+    const responses = result.stdout.trim().split('\n').map(JSON.parse);
+    assert.equal(responses.length, 6);
+    for (const response of responses) { assert.equal(response.error, undefined); assert.notEqual(response.result.isError, true); }
+    assert.equal(responses[2].result.structuredContent.runtimeState, 'running');
+    assert.equal(responses[4].result.structuredContent.accepted, true);
+    assert.equal(responses[5].result.structuredContent.runtimeState, 'idle');
+  }
+});
+
+test('EOF and MCP-only signals preserve an active synthetic Team on the same host', async t => {
+  for (const signal of [null, 'SIGINT', 'SIGTERM', 'SIGKILL']) await t.test(signal ?? 'EOF', async t => {
+    const fixture = await ownedFixture(t);
+    const contextPath = join(fixture.home, 'exit-context.json');
+    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs'), '--permission-authority', fixture.config.permissionAuthority], {
+      env: { ...fixture.env, DSH_AGENT_TEAM_PERMISSION_CONTEXT: contextPath }, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const closed = once(child, 'close');
+    t.after(async () => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); await closed; });
+    const reader = createInterface({ input: child.stdout });
+    t.after(() => reader.close());
+    const lines = reader[Symbol.asyncIterator]();
+    let stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
+    await authorizeSyntheticMcp(child, contextPath, fixture.issue);
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }) + '\n');
+    assert.equal(JSON.parse((await lines.next()).value).id, 1);
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_create', arguments: { key: 'active-exit', cwd: fixture.home, text: 'hang' } } }) + '\n');
+    const created = JSON.parse((await lines.next()).value);
+    assert.equal(created.result.structuredContent.accepted, true);
+    const pid = (await fixture.owner.request('health')).host.pid;
+    if (signal) assert.equal(child.kill(signal), true); else child.stdin.end();
+    const [code, actualSignal] = await closed;
+    assert.equal(actualSignal, signal); if (!signal) assert.equal(code, 0);
+    assertNativeDiagnostics(stderr);
+    assert(birth(pid));
+    assert.equal((await fixture.owner.request('health')).host.pid, pid);
+    assert.equal((await fixture.owner.request('status', { teamId: 'active-exit' })).runtimeState, 'running');
+    assert.equal((await fixture.owner.request('result', { teamId: 'active-exit' })).completed, false);
+    assert.equal(await fixture.starts(), 1);
+    assert.equal((await fixture.owner.shutdown()).reason, 'active-or-uncertain-work');
+    assert.equal((await fixture.owner.request('stop', { teamId: 'active-exit' })).quiescent, true);
+  });
 });
 
 test('malformed and oversized stdio input never runs a bridge operation', async () => {
