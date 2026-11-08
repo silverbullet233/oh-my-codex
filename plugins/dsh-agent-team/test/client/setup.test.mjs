@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile, rm, symlink, realpath, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { setup, runSetupCommand } from '../../scripts/setup.mjs';
+import { setup, runSetupCommand, hostVersion } from '../../scripts/setup.mjs';
 import { initializeOwnedHome } from '../../src/host/manager.mjs';
 import { ownedFixture } from '../fixtures/owned.mjs';
 import { writePrivate } from '../../src/host/files.mjs';
@@ -17,9 +17,9 @@ async function fixture(t) {
     calls.push({ command, args }); assert.equal(opts.env.DSH_HOME, await realpath(home));
     assert(args.includes('--ignore-scripts')); assert(args.includes('--save-exact')); assert(args.includes('--registry=https://registry.npmjs.org'));
     const name = args[5].startsWith(team) ? team : 'dsh-team-roles';
-    assert.equal(args[5], name === team ? `${team}@0.2.2-alpha.2` : await realpath(tarball));
+    assert.equal(args[5], name === team ? `${team}@0.2.2-alpha.3` : await realpath(tarball));
     await put(join(home, 'profiles/web/package.json'), { dsh: { profile: { bundles: [team, 'dsh-team-roles'] } } });
-    await installed(home, name, name === team ? '0.2.2-alpha.2' : '0.6.0');
+    await installed(home, name, name === team ? '0.2.2-alpha.3' : hostVersion);
   } };
   return { ...f, home, workspace, options, calls };
 }
@@ -44,10 +44,11 @@ test('an interrupted or failed setup is refused on repeat rather than repaired o
   await assert.rejects(setup(fresh.options), { code: 'SETUP_INCOMPLETE' }); assert.equal(fresh.calls.length, 0);
 });
 test('version, bundle and foreign-profile mismatches are refused without reinstall', async t => {
-  for (const kind of ['team', 'host', 'bundle', 'symlink']) {
+  for (const kind of ['team', 'host', 'stale-host', 'bundle', 'symlink']) {
     const f = await fixture(t); await setup(f.options); f.calls.length = 0;
     if (kind === 'team') await installed(f.home, team, '0.1.0');
     if (kind === 'host') await installed(f.home, 'dsh-team-roles', '0.4.0');
+    if (kind === 'stale-host') await installed(f.home, 'dsh-team-roles', '0.6.0');
     if (kind === 'bundle') await put(join(f.home, 'profiles/web/package.json'), { dsh: { profile: { bundles: [team] } } });
     if (kind === 'symlink') { await rm(join(f.home, 'profiles/web'), { recursive: true }); await symlink(f.workspace, join(f.home, 'profiles/web')); }
     await assert.rejects(setup(f.options), { code: 'SETUP_INCOMPLETE' }); assert.equal(f.calls.length, 0);

@@ -8,6 +8,8 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClientError } from '../src/native/errors.mjs';
 const team = '@deepseek-ai/dsh-experimental-agent-team-profile';
+/** Candidate host version required by this unreleased client; the published 0.6.0 archive remains scoped to DSH 0.2.2-alpha.2. */
+export const hostVersion = '0.6.1';
 export const runSetupCommand = (command, args, options) => new Promise((resolve_, reject) => {
   execFile(command, args, { ...options, encoding: 'utf8', timeout: 180000, maxBuffer: 256 * 1024, windowsHide: true }, error => {
     if (error) reject(new ClientError('INSTALL_FAILED', `Profile installation failed (${error.killed ? 'timeout/output limit' : Number.isInteger(error.code) ? `exit ${error.code}` : 'could not execute'}). Inspect the dedicated Home; do not retry over partial or uncertain state.`));
@@ -21,7 +23,7 @@ async function verifyInstalled(home) {
     const manifestPath = await realpath(join(web, 'package.json'));
     if (!manifestPath.startsWith(`${home}/`)) throw new Error();
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    for (const [name, expected] of [[team, version], ['dsh-team-roles', '0.6.0']]) {
+    for (const [name, expected] of [[team, version], ['dsh-team-roles', hostVersion]]) {
       const path = await realpath(join(web, 'node_modules', name, 'package.json'));
       if (!path.startsWith(`${home}/`)) throw new Error();
       const pkg = JSON.parse(await readFile(path, 'utf8'));
@@ -57,7 +59,7 @@ export async function setup({ tarball, workspace, config = configuration(), env 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const [tarball, workspace = process.cwd()] = process.argv.slice(2);
-    if (!tarball) throw new ClientError('USAGE', 'Usage: node scripts/setup.mjs /absolute/verified-dsh-team-roles-0.6.0.tgz /absolute/workspace');
+    if (!tarball) throw new ClientError('USAGE', `Usage: node scripts/setup.mjs /absolute/verified-dsh-team-roles-${hostVersion}.tgz /absolute/workspace`);
     const result = await setup({ tarball, workspace });
     console.log(result.reused ? 'Matching dedicated profile retained; verify connectivity with MCP health.' : 'Dedicated profile installed; verify connectivity with MCP health.');
   } catch (error) {

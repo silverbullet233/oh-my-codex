@@ -15,7 +15,7 @@ export function createDispatcher(client) {
     try {
       if (request.method === 'initialize') {
         initialized = true;
-        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: 'dsh-agent-team', version: '0.4.0' } } };
+        return { ...response, result: { protocolVersion: protocolVersions.includes(request.params?.protocolVersion) ? request.params.protocolVersion : protocolVersions[0], capabilities: { tools: { listChanged: false }, experimental: { 'codex/sandbox-state': {} } }, serverInfo: { name: 'dsh-agent-team', version: '0.4.1' } } };
       }
       if (request.method === 'ping') return { ...response, result: {} };
       if (!initialized) return { ...response, error: { code: -32002, message: 'Initialize the MCP connection first.' } };
@@ -29,7 +29,7 @@ export function createDispatcher(client) {
       try {
         const { view, ...nativeArgs } = args;
         const method = methods.get(definition.name);
-        const result = await client.request(method, nativeArgs, options);
+        const result = await client.request(method, nativeArgs, { ...options, protocolMeta: structuredClone(request.params._meta) });
         if (view === 'summary') return { ...response, result: boundedObservation(method, result, nativeArgs) };
         return { ...response, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } };
       } catch (error) {

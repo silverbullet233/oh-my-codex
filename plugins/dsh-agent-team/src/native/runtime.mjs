@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClientError } from './errors.mjs';
-export const version = '0.2.2-alpha.2';
+export const version = '0.2.2-alpha.3';
 export async function loadRuntime(anchor) {
   if (!anchor) throw new ClientError('RUNTIME_REQUIRED', 'Set DSH_AGENT_TEAM_RUNTIME to the supported official DSH package directory or package.json. No global runtime is changed.');
   let file = resolve(anchor);

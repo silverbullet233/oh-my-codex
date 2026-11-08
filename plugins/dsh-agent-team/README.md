@@ -2,11 +2,15 @@
 
 Opt-in Codex MCP client for native DSH Teams. Codex lazily starts and reuses a **dedicated ordinary DSH Web host**, then connects through the official Node Connection/Typert Gateway. The native host owns role policy, immutable member snapshots, execution, persistence, tools and approvals. The client contains manifests, a skill, native API calls and process lifecycle management.
 
-Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)**. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
+Use Node **>=24.9.0**, exact official **DSH 0.2.2-alpha.2**, and the published **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)** archive. Older host 0.3.0 and 0.4.0 expose the old transport and are incompatible. Install the checksum-verified 0.6.0 release archive before starting this published client; normal installation does not build a source branch. No global daemon, SDK composition or private socket is used.
 
-These instructions target catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
+These instructions target the published catalog **v0.3.0** / plugin **0.4.0**. Use that fixed tag only after publication and asset verification. The catalog and plugin versions are independent; do not use a floating ref.
 
-This catalog repository is currently private. Git must already authenticate an account with repository access before marketplace registration; keep that authentication in the existing Git credential manager. A published Release does not change repository visibility, and anonymous requests may return 404. Never put tokens in repository URLs or MCP configuration.
+**Unreleased candidate (catalog 0.3.1 / plugin 0.4.1, this branch):** moves the exact runtime pin to DSH `0.2.2-alpha.3` and requires the matching **unreleased** dsh-team-roles 0.6.1 candidate build; the published 0.6.0 archive supports only `0.2.2-alpha.2`. The candidate is not tagged, has no Release assets and is not published. Validate it only from a locally built plugin in an isolated home; do not claim a release URL, digest or tag for it.
+
+**Unreleased candidate:** [Team permissions](docs/permissions.md) request enabled network as the product default and retain reliably executable filesystem inheritance. A supported network-enabled state is passed unchanged to the official whole-host launcher; native approval stays a separately identified default. Restricted/unknown opaque network cannot safely be separated from filesystem/admin policy and is refused before startup, without rewriting or full-access retry. Missing metadata/launcher or unsupported state uses an explicit native full-access fallback. The [historical real-model report](docs/acceptance-2026-11-08.md) records exact older hashes and does not certify this follow-up. The authenticated URL query is `dsh_team_web_url({teamId})`.
+
+This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 See [getting started](docs/getting-started.md) for dedicated-home setup and Codex installation.
 
@@ -16,6 +20,7 @@ For Agent-guided initialization, use [docs/bootstrap.md](docs/bootstrap.md). It 
 | --- | --- | --- |
 | `health` | `dsh_team_health` | Start/reuse the owned host and verify native API/runtime/home identity |
 | `web` | `dsh_team_web` | Open the authorized native Web entry; return only its clean origin |
+| `web_url` | `dsh_team_web_url` | Explicit secret-bearing query: return the existing owned host authenticated homepage URL with only the managed root teamId after an explicit user request; no browser, start, adoption or Team/session permalink |
 | `create` | `dsh_team_create` | Idempotent native Team creation and initial input admission |
 | `send` | `dsh_team_send` | Queue/steer the same Team with a durable input ID |
 | `status` | `dsh_team_status` | Native activity, member identity and configured/selected/used routes |
@@ -36,7 +41,7 @@ EOF closes only the API Peer. Native work and its host survive. Create keys and 
 
 Roles and provider authentication are configured in **native Web → Settings → Team roles / Models**. New reservations use current roles; existing members retain snapshots. Empty catalogs use native model inheritance. Inputs are text-only. This plugin changes no Codex model, subscription or ordinary entrypoint.
 
-Startup uses an OS-released SQLite transaction lock and provisional launcher/child attribution. Reuse and signaling require matching runtime, native home, nonce, PID and process start time. New instances use `--no-open --port 0` on loopback. A live or uncertain startup is retained rather than replaced. Shutdown refuses active/unknown work, uses the native five-second admission lease, and never force-kills. Persistent Session/attachment/role data is independent of process lifetime. The short-lived launch capability is held only in a private instance record while its process exists; it is never printed or returned by MCP.
+Startup uses an OS-released SQLite transaction lock and provisional launcher/child attribution. Reuse and signaling require matching runtime, native home, nonce, PID and process start time. New instances use `--no-open --port 0` on loopback. A live or uncertain startup is retained rather than replaced. Shutdown refuses active/unknown work, uses the native five-second admission lease, and never force-kills. Persistent Session/attachment/role data is independent of process lifetime. An authenticated launch capability is held only in the private instance record for the lifetime of that host process (there is no independent short TTL); startup, health, status, create and `dsh_team_web` never return it. Only an explicitly requested `dsh_team_web_url` request returns the authenticated owned-host URL, and that response is a bearer credential that can appear in MCP/client history.
 
 See [validation scope](docs/validation.md) for the distinction between synthetic transport fixtures and the real native integration gate.
 

@@ -146,13 +146,13 @@ test('missing or mismatched permission receipts stay uncertain without replays',
   });
 });
 test('MCP preserves released runtime package identity with null sourceSha and admits compatible work', async t => {
-  const evidence = { sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.2' } };
+  const evidence = { sourceSha: null, runtime: { packageVersion: '0.2.2-alpha.3' } };
   const { client, calls } = await fixture(t, { healthResult: evidence });
   const dispatch = createDispatcher(client);
   await dispatch({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   const health = await dispatch({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } });
   assert.equal(health.result.structuredContent.sourceSha, null);
-  assert.equal(health.result.structuredContent.runtime.packageVersion, '0.2.2-alpha.2');
+  assert.equal(health.result.structuredContent.runtime.packageVersion, '0.2.2-alpha.3');
   assert.deepEqual(health.result.structuredContent.api, contract);
   const params = { key: 'released-runtime', cwd: '/synthetic', text: 'Synthetic release runtime input.' };
   const created = await dispatch({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_create', arguments: params } });

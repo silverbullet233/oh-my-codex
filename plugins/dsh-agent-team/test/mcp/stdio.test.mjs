@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { authorizeSyntheticMcp } from '../fixtures/permission-context.mjs';
 import { assertNativeDiagnostics } from '../fixtures/diagnostics.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -8,16 +10,18 @@ import { join, resolve, delimiter } from 'node:path';
 import { ownedFixture } from '../fixtures/owned.mjs';
 import { birth, delay } from '../../src/host/files.mjs';
 
-function run(env, lines) {
+function run(env, lines, fixture) {
   return new Promise((resolve_, reject) => {
-    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs')], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const contextPath = fixture && join(fixture.home, `mcp-context-${randomUUID()}.json`);
+    const child = spawn(process.execPath, [resolve(import.meta.dirname, '../../src/mcp/main.mjs'), ...(fixture ? ['--permission-authority', fixture.config.permissionAuthority] : [])], { env: fixture ? { ...env, DSH_AGENT_TEAM_PERMISSION_CONTEXT: contextPath } : env, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     child.on('error', reject);
     child.on('close', (code) => resolve_({ code, stdout, stderr }));
-    child.stdin.end(lines);
+    if (fixture) authorizeSyntheticMcp(child, contextPath, fixture.issue).then(() => child.stdin.end(lines), reject);
+    else child.stdin.end(lines);
   });
 }
 
@@ -29,7 +33,7 @@ test('stdio EOF preserves its owned native host and a new MCP process reconnects
   ].map(row => JSON.stringify(row)).join('\n') + '\n';
   let pid;
   for (let iteration = 0; iteration < 2; iteration++) {
-    const result = await run(fixture.env, lines);
+    const result = await run(fixture.env, lines, fixture);
     assert.equal(result.code, 0, result.stderr); assertNativeDiagnostics(result.stderr);
     const responses = result.stdout.trim().split('\n').map(JSON.parse);
     assert.equal(responses.length, 2);
@@ -60,7 +64,7 @@ test('stdio wait does not hold stop behind its deadline and queued cancellation 
     { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'dsh_team_send', arguments: { teamId: 'waiting', inputId: 'cancelled', text: 'Must not dispatch' } } },
     { jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 5 } },
   ].map(row => JSON.stringify(row)).join('\n') + '\n';
-  const result = await run(fixture.env, lines);
+  const result = await run(fixture.env, lines, fixture);
   assert.equal(result.code, 0, result.stderr); assertNativeDiagnostics(result.stderr);
   const responses = result.stdout.trim().split('\n').map(JSON.parse);
   assert(responses.findIndex(r => r.id === 4) < responses.findIndex(r => r.id === 3));
@@ -81,7 +85,7 @@ test('a long-running browser launcher cannot block the next serialized MCP healt
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'dsh_team_web', arguments: {} } },
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'dsh_team_health', arguments: {} } },
   ].map(row => JSON.stringify(row)).join('\n') + '\n';
-  const resultPromise = run(env, lines);
+  const resultPromise = run(env, lines, fixture);
   for (let i = 0; i < 200 && !pid; i++) {
     try { pid = Number(await readFile(pidFile, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     if (!pid) await delay(10);
