@@ -107,5 +107,9 @@ test('initialization permission is explicit, limited to setup/health and require
   assert(guide.includes('actual `dsh_team_health`'));
   assert(guide.includes('CLI-only health is insufficient'));
   assert(guide.includes('There is no auto-discovery'));
+  assert(guide.includes('codex mcp list --json'));
+  assert(guide.includes('${PLUGIN_DATA}'));
+  assert(guide.includes('Strip the exact `/node_modules/@deepseek-ai/dsh` suffix'));
+  assert(!guide.includes('process-scoped alternative'));
   assert(guide.includes('5538a263d3d2e4f05e843153e524e1501f1564324951a9f21ed6470de5ade67e'));
 });
