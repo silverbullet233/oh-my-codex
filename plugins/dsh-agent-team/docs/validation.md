@@ -1,3 +1,5 @@
+> Current network-default follow-up: network is enabled product intent, not inherited network policy. Filesystem state is inherited only through a supported, unchanged launcher state. Restricted/unknown opaque network cannot safely be separated from filesystem/admin policy and is refused before startup/work; no state rewrite or full-access retry is implemented. Historical results below apply to their exact recorded heads.
+
 The unreleased 0.3.1 / 0.4.1 candidate adds the explicit `dsh_team_web_url` disclosure command: protocol/argument gating, attributed-entry and managed-root validation, NO-side-effect behavior, verbatim URL fidelity with synthetic values, redacted errors, and setup host-version coherence are covered by candidate unit/transport tests. In an earlier restricted-environment attempt, keyless native acceptance was **UNVERIFIED**: its owned-host startup path requires process start-time inspection (`/bin/ps`), which the validating sandbox denies (`PROCESS_UNVERIFIABLE`); that is an environment limitation, not a pass or an incompatibility.
 
 # Validation scope
@@ -57,3 +59,5 @@ The follow-up adds in-memory regressions through the actual manager ensure/reque
 The mergeable scope is supported opaque-state handoff, explicit capability-gap fallback, native policy propagation and fail-closed attribution/admission. Merging does not certify the unsupported policy channels or authorize release/deployment. Candidate versions and published installation pins stay separate.
 
 The 2026-11-08 follow-up on Node 26.0.0 passed build, package inspection and **144 isolated tests** with zero failures/cancellations/skips. The matching host documentation follow-up passed build, package inspection and **236 isolated executions**. Full listener/lifecycle CI on the new heads remains required before merge.
+
+The network-default follow-up passed local Node 26 build/package checks, **150 client isolated tests** and **236 host isolated executions**, with zero failures/cancellations/skips. New regressions cover requested open-network provenance, preserved opaque fields, refusal before work, capability gaps combined with restricted/unknown network, and refusal to adopt older unknown-network bindings. No real provider/network call or security-setting change was made. Full current-head CI/review is required before merge.

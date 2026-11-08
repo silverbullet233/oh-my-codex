@@ -36,7 +36,7 @@ await runBoundaryProbe({ ctx: new Context(), fileSystem: LocalFileSystem, paths:
       const state = { permissionProfile: { type: 'managed', file_system: { type: 'restricted', entries: [
         { path: { type: 'special', value: { kind: 'root' } }, access: 'read' },
         pathEntry(allowed, 'write'), pathEntry(protectedFile, 'read'), pathEntry(denied, 'deny'),
-      ] }, network: 'restricted' }, sandboxCwd: pathToFileURL(root).href, codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, futureField: { survives: true } };
+      ] }, network: 'enabled' }, sandboxCwd: pathToFileURL(root).href, codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, futureField: { survives: true } };
       const context = await readPermissionContext({}, Date.now(), { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: executable } });
       const invocation = hostInvocation({ sandbox: context.sandbox, cli, profile: 'web', home: join(root, 'home'), instanceId: 'synthetic-boundary', permissionBinding: context.bindingHash, permissionExecution: context.execution });
       printRecord({ type: 'dsh-boundary-start', root, state, executable, timeout: 20000 });

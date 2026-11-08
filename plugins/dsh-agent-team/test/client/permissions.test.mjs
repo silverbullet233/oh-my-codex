@@ -17,7 +17,7 @@ test('no flags or Codex-looking env manufacture inheritance for the full-access 
   assert.equal(context.provenance.inheritance, 'unavailable');
   assert.equal(context.provenance.osLimitsVerified, false);
   assert.equal(context.provenance.codexSandbox, 'unknown');
-  assert.deepEqual(context.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' });
+  assert.deepEqual(context.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'enabled' });
 });
 
 test('synthetic signed workspace/full-access statements retain native intent without claiming OS verification', async t => {

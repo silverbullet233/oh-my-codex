@@ -44,14 +44,14 @@ test('full-access fallback starts and reuses only its captured native source and
   assert.equal(health.permissionSource.fallbackReason, 'sandbox-metadata-unavailable');
   assert.equal(health.permissionSource.inheritance, 'unavailable');
   assert.equal(health.execution.source, 'full-access-fallback');
-  assert.equal(health.execution.network, 'unverified');
+  assert.equal(health.execution.network, 'product-default-open');
   assert.deepEqual(health.host.permissionExecution, health.execution);
   const created = await fixture.owner.request('create', { key: 'fallback', cwd: fixture.home, text: 'Synthetic fallback policy check.' });
   assert.equal(created.permissionProfile.sandboxMode, 'danger-full-access');
   assert.equal(created.permissionProfile.approvalPolicy, 'never');
-  assert.equal(created.permissionProfile.networkAccess, 'unknown');
+  assert.equal(created.permissionProfile.networkAccess, 'enabled');
   await fixture.owner.request('send', { teamId: created.teamId, inputId: 'same-fallback', text: 'Synthetic continuation.' });
-  const state = { permissionProfile: { type: 'managed' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
+  const state = { permissionProfile: { type: 'managed', network: 'enabled' }, sandboxCwd: new URL(`file://${fixture.home}`).href };
   await assert.rejects(fixture.owner.request('health', {}, { protocolMeta: { 'codex/sandbox-state': state } }), { code: 'HOST_PERMISSION_MISMATCH' });
   assert.equal(await fixture.starts(), 1);
   await fixture.owner.request('stop', { teamId: created.teamId });

@@ -16,9 +16,74 @@ const state = { permissionProfile: { type: 'managed', file_system: { type: 'rest
   { path: { type: 'path', path: '/work' }, access: 'write' },
   { path: { type: 'path', path: '/work/.git' }, access: 'read' },
   { path: { type: 'path', path: '/work/private' }, access: 'deny' },
-] }, network: 'restricted' }, sandboxCwd: 'file:///work', codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, future: { preserve: true } };
+] }, network: 'enabled' }, sandboxCwd: 'file:///work', codexLinuxSandboxExe: null, useLegacyLandlock: false, useMxc: false, future: { preserve: true } };
 const metadata = { 'codex/sandbox-state': state, 'codex/sandbox-launcher': { codexExecutable: '/opt/codex' } };
 const context = meta => readPermissionContext({}, Date.now(), meta);
+
+test('open network is product intent while filesystem state and native approval provenance remain distinct', async () => {
+  const inherited = await context(metadata), fallback = await context(undefined);
+  for (const c of [inherited, fallback]) {
+    assert.equal(c.permissions.networkAccess, 'enabled');
+    assert.equal(c.execution.network, 'product-default-open');
+    assert.equal(c.provenance.networkSource, 'product-default');
+    assert.equal(c.provenance.effectiveNetworkVerified, false);
+    assert.equal(c.provenance.osLimitsVerified, false);
+    assert.equal(c.provenance.codexApproval, 'unknown');
+  }
+  assert.equal(inherited.provenance.filesystemSource, 'codex-request-metadata');
+  assert.equal(inherited.provenance.approvalSource, 'native-default');
+  assert.equal(inherited.provenance.codexNetwork, 'not-inherited');
+  assert.equal(inherited.permissions.approvalPolicy, 'ask');
+  assert.equal(fallback.permissions.approvalPolicy, 'never');
+  assert.equal(inherited.sandbox.stateJson, JSON.stringify(state));
+  // Pre-change same-state hosts requested unknown network, so the new policy
+  // must not adopt them merely because their filesystem state matches.
+  const oldBinding = { ...inherited.binding, permissions: { ...inherited.permissions, networkAccess: 'unknown' } };
+  delete oldBinding.networkPolicy;
+  assert.throws(() => verifyHostBinding({ permissionBinding: fingerprint(oldBinding), permissionExecution: inherited.execution }, inherited), { code: 'HOST_PERMISSION_MISMATCH' });
+});
+
+test('restricted or unknown opaque network cannot be stripped, guessed or retried as full access', async t => {
+  for (const network of ['restricted', undefined, 'future-policy']) await t.test(String(network), async () => {
+    const offeredState = { ...state, permissionProfile: { ...state.permissionProfile, network } };
+    const offered = { ...metadata, 'codex/sandbox-state': offeredState };
+    const before = JSON.stringify(offered), c = await context(offered);
+    assert.equal(c.sandbox.stateJson, JSON.stringify(offeredState));
+    assert.equal(c.execution.networkOpenSupported, false);
+    assert.throws(() => sandboxInvocation(c, ['node', 'must-not-run']), { code: 'NETWORK_POLICY_SPLIT_UNAVAILABLE' });
+    const owner = new OwnedHost({});
+    owner.ensure = async () => assert.fail('unsupported separation must not connect, start or reuse a host');
+    const health = await owner.request('health', {}, { protocolMeta: offered });
+    assert.equal(health.ok, false);
+    assert.equal(health.owned, false);
+    assert.equal(health.limitation.code, 'NETWORK_POLICY_SPLIT_UNAVAILABLE');
+    for (const method of ['web', 'create', 'send', 'answer', 'approval']) {
+      await assert.rejects(owner.request(method, {}, { protocolMeta: offered }), { code: 'NETWORK_POLICY_SPLIT_UNAVAILABLE' });
+    }
+    assert.equal(JSON.stringify(offered), before);
+  });
+});
+
+test('restricted or unknown network is never discarded for a missing launcher or unsupported state', async () => {
+  for (const [type, network, launcher, code] of [
+    ['managed', 'restricted', undefined, 'SANDBOX_LAUNCHER_UNAVAILABLE'],
+    ['managed', undefined, undefined, 'SANDBOX_LAUNCHER_UNAVAILABLE'],
+    ['managed', 'future-policy', undefined, 'SANDBOX_LAUNCHER_UNAVAILABLE'],
+    ['external', 'restricted', '/opt/codex', 'SANDBOX_STATE_UNSUPPORTED'],
+    ['external', 'future-policy', '/opt/codex', 'SANDBOX_STATE_UNSUPPORTED'],
+    ['future', 'restricted', '/opt/codex', 'SANDBOX_STATE_UNSUPPORTED'],
+  ]) {
+    const restricted = { ...state, permissionProfile: { ...state.permissionProfile, type, network } };
+    const offered = { 'codex/sandbox-state': restricted, ...(launcher ? { 'codex/sandbox-launcher': { codexExecutable: launcher } } : {}) };
+    const c = await context(offered);
+    assert.equal(c.provenance.source, 'codex-request-metadata');
+    assert.equal(c.sandbox.stateJson, JSON.stringify(restricted));
+    const owner = new OwnedHost({});
+    owner.ensure = async () => assert.fail('capability absence cannot erase a known restriction');
+    assert.equal((await owner.request('health', {}, { protocolMeta: offered })).limitation.code, code);
+    await assert.rejects(owner.request('create', {}, { protocolMeta: offered }), { code });
+  }
+});
 
 test('protocol capability and full metadata reach client options, detached from model arguments', async () => {
   let captured;
@@ -38,7 +103,7 @@ test('ordinary unsigned default and explicit configuration are usable native int
   const value = await readPermissionContext(configuration({ CODEX_YOLO: 'true', DSH_AGENT_TEAM_PERMISSION_PROFILE: '/ignored' }));
   requireExecutableContext(value);
   assert.equal(value.provenance.source, 'full-access-fallback');
-  assert.equal(value.permissions.networkAccess, 'unknown');
+  assert.equal(value.permissions.networkAccess, 'enabled');
   assert.equal(value.provenance.codexApproval, 'unknown');
   assert.equal(value.permissions.approvalPolicy, 'never');
   const root = await mkdtemp(join(tmpdir(), 'dsh-config-')); t.after(() => rm(root, { recursive: true, force: true }));
@@ -123,7 +188,7 @@ test('unavailable inheritance uses a native full-access fallback with reason and
     assert.equal(c.provenance.fallbackReason, reason);
     assert.equal(c.provenance.inheritance, 'unavailable');
     assert.equal(c.provenance.osLimitsVerified, false);
-    assert.deepEqual(c.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' });
+    assert.deepEqual(c.permissions, { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'enabled' });
     assert.equal(c.sandbox, undefined);
     assert.equal(c.execution.fallbackReason, reason);
     const invocation = hostInvocation({ ...c, cli: '/runtime/bin.js', profile: 'web' });

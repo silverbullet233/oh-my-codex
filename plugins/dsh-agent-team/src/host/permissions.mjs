@@ -52,14 +52,14 @@ export async function readPermissionContext(config, now = Date.now(), metadata) 
  * tuple grants no OS privileges and makes no claim about Codex or networking. */
 function fullAccessFallback(config, reason, unavailableSandbox) {
   const source = 'full-access-fallback';
-  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'unknown' };
-  const binding = { source, fallbackReason: reason, cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions,
+  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'never', writableRoots: [], networkAccess: 'enabled' };
+  const binding = { source, fallbackReason: reason, networkPolicy: 'product-default-open-v1', cwd: resolve(config.cwd ?? process.cwd()), backend: 'native', permissions,
     ...(unavailableSandbox ? { unavailableSandbox } : {}) };
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
-    execution: { backend: 'native', source, fallbackReason: reason, filesystem: 'native-policy', network: 'unverified', approval: 'native-policy' },
+    execution: { backend: 'native', source, fallbackReason: reason, filesystem: 'native-policy', network: 'product-default-open', approval: 'native-policy' },
     provenance: { source, fallbackReason: reason, inheritance: 'unavailable', codexSandbox: 'unknown', codexApproval: 'unknown', codexNetwork: 'unknown',
-      signatureVerified: false, osLimitsVerified: false,
-      limitations: ['Codex permission inheritance is unavailable; full access is a DSH native policy default.', 'Network access is unknown; outer process and OS restrictions still apply.'] } };
+      networkSource: 'product-default', effectiveNetworkVerified: false, signatureVerified: false, osLimitsVerified: false,
+      limitations: ['Codex permission inheritance is unavailable; full access is a DSH native policy default.', 'Enabled network is requested product policy, not proof of access; outer process and OS restrictions still apply.'] } };
 }
 async function readAttestedContext(config, now) {
   if (!config.permissionAuthority || !config.permissionContext) fail('PERMISSION_CONTEXT_REQUIRED');
@@ -123,20 +123,26 @@ export function sandboxContext(metadata, config = {}) {
     if (!isAbsolute(cwd) || cwd.includes('\0')) throw new Error();
   } catch { throw new ClientError('SANDBOX_METADATA_INVALID', 'Sandbox state must be an opaque JSON object with a native file cwd.'); }
   const supported = ['managed', 'disabled'].includes(state.permissionProfile.type);
-  // Capability absence is the only protocol fallback. Never catch an executor,
+  const networkOpenSupported = state.permissionProfile.type === 'disabled' || state.permissionProfile.network === 'enabled';
+  const unsupportedWithoutNetworkContract = !supported && state.permissionProfile.network === undefined;
+  // Known network restrictions survive even capability absence. Never catch an executor,
   // identity, configuration or OS refusal and retry it with this broader policy.
-  if (!supported || !launcher) return fullAccessFallback({ ...config, cwd }, !supported ? 'sandbox-state-unsupported' : 'sandbox-launcher-unavailable', { stateJson, launcher: launcher ?? null });
-  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'unknown' };
-  const binding = { source: 'codex-request-metadata', cwd, backend: 'codex-sandbox-host-v1', stateJson, launcher: launcher ?? null, permissions };
+  if ((!supported || !launcher) && (networkOpenSupported || unsupportedWithoutNetworkContract)) return fullAccessFallback({ ...config, cwd }, !supported ? 'sandbox-state-unsupported' : 'sandbox-launcher-unavailable', { stateJson, launcher: launcher ?? null });
+  // The opaque network restriction has no trustworthy user/admin origin tag.
+  // Preserve it; do not rewrite it or select another execution path to remove it.
+  const permissions = { sandboxMode: 'danger-full-access', approvalPolicy: 'ask', writableRoots: [], networkAccess: 'enabled' };
+  const binding = { source: 'codex-request-metadata', networkPolicy: 'product-default-open-v1', cwd, backend: 'codex-sandbox-host-v1', stateJson, launcher: launcher ?? null, permissions };
   return { binding, bindingHash: fingerprint(binding), permissions, overrides: [],
-    sandbox: { stateJson, launcher, supported },
-    execution: { backend: binding.backend, scope: 'entire-native-host', filesystem: 'launcher-required', network: 'opaque-state-only', approval: 'native-ask', supported, launcherAvailable: !!launcher },
-    provenance: { source: binding.source, codexSandbox: 'opaque', codexApproval: 'unknown', codexNetwork: 'partial-opaque-state', signatureVerified: false, osLimitsVerified: false } };
+    sandbox: { stateJson, launcher, supported, networkOpenSupported },
+    execution: { backend: binding.backend, scope: 'entire-native-host', filesystem: 'launcher-required', network: 'product-default-open', networkOpenSupported, approval: 'native-ask', supported, launcherAvailable: !!launcher },
+    provenance: { source: binding.source, filesystemSource: 'codex-request-metadata', networkSource: 'product-default', approvalSource: 'native-default',
+      codexSandbox: 'opaque', codexApproval: 'unknown', codexNetwork: 'not-inherited', effectiveNetworkVerified: false, signatureVerified: false, osLimitsVerified: false } };
 }
 
 export function requireExecutableContext(context) {
   if (context.sandbox && !context.sandbox.supported) throw new ClientError('SANDBOX_STATE_UNSUPPORTED', 'External or unsupported sandbox state cannot be recreated locally. Observation remains available; no work was submitted.');
   if (context.sandbox && !context.sandbox.launcher) throw new ClientError('SANDBOX_LAUNCHER_UNAVAILABLE', 'The caller supplied sandbox state without a supported local launcher. No PATH lookup or native fallback was attempted.');
+  if (context.sandbox && context.sandbox.networkOpenSupported !== true) throw new ClientError('NETWORK_POLICY_SPLIT_UNAVAILABLE', 'The opaque sandbox restricts or does not identify network policy; its user/admin origin cannot be established. The official launcher cannot independently enable network while preserving these filesystem rules and management requirements. The state was preserved; no host, rewritten policy or full-access retry was attempted. Use a compatible caller policy through its authorized configuration.');
   if (!context.sandbox && context.permissions.networkAccess === 'restricted') throw new ClientError('NETWORK_ENFORCEMENT_UNAVAILABLE', 'Native DSH cannot enforce the requested restricted user-tool network. No work was submitted.');
 }
 
