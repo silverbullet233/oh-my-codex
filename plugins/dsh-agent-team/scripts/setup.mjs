@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClientError } from '../src/native/errors.mjs';
 const team = '@deepseek-ai/dsh-experimental-agent-team-profile';
-/** Candidate host version required by this unreleased client; the published 0.6.0 archive remains scoped to DSH 0.2.2-alpha.2. */
+/** Exact released host required by this client; earlier host/runtime combinations are incompatible. */
 export const hostVersion = '0.6.1';
 export const runSetupCommand = (command, args, options) => new Promise((resolve_, reject) => {
   execFile(command, args, { ...options, encoding: 'utf8', timeout: 180000, maxBuffer: 256 * 1024, windowsHide: true }, error => {

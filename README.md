@@ -12,8 +12,7 @@ For an Agent-executable installation workflow with verified published pins, isol
 
 Register the marketplace and install the plugin with a CLI that supports `codex plugin`:
 
-**Installation target (unreleased candidate):** catalog **v0.3.1** / plugin **0.4.3** — publication pending; this tag does not exist yet and there are no Release assets. The latest **published** installation remains catalog **v0.3.0** / plugin **0.4.0**, paired with exact DSH `0.2.2-alpha.2` and the published dsh-team-roles 0.6.0 archive; select the published `v0.3.0` tag with the same commands for released installation. Use the candidate pins below only after the candidate release is published and its assets are verified. The earlier catalog **v0.2.1** / plugin **0.3.2** was published on **2026-10-31**; immutable older tags do not gain these additions.
-
+**Release target:** catalog **v0.3.1** / plugin **0.4.3**, paired with exact official DSH / Team Profile **0.2.2-alpha.3** and **[dsh-team-roles 0.6.1](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.1)**. Catalog publication is pending until the reviewed main commit is tagged, its workflow succeeds and its assets are verified. Before installing, verify the fixed Release and tag using the installation guide. Older tags retain their original contents.
 This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
 ```sh
@@ -23,13 +22,11 @@ codex plugin add dsh-agent-team@oh-my-codex
 
 Start a new Codex session after installation. DSH Agent Team requires one-time setup of an exact supported DSH runtime and a new dedicated home with the native host plugin. Its MCP client then starts/reuses that ordinary Web host lazily. Follow the [getting-started guide](plugins/dsh-agent-team/docs/getting-started.md) for current runtime and host-plugin requirements.
 
-**Unreleased candidate (catalog 0.3.1 / plugin 0.4.3):** the source on this branch moves the exact DSH runtime pin to `0.2.2-alpha.3` and requires the matching **unreleased** dsh-team-roles 0.6.1 candidate build. It is not tagged, has no GitHub Release assets and is not published to npm; the `--ref v0.3.1` commands above are release-preparation pins for this candidate, not a published installation instruction, and no release URL/tag may be claimed for it. The published catalog v0.3.0 / plugin 0.4.0 remains paired with exact DSH `0.2.2-alpha.2` and the published dsh-team-roles 0.6.0 archive.
+Plugin 0.4.3 binds its runtime and DSH Home through Codex's persistent `${PLUGIN_DATA}` paths. Discover the resolved paths with `codex mcp list --json` in the intended Codex home, install the runtime and verified host there, then restart and call actual `dsh_team_health`. Terminal exports alone do not configure MCP. See the [Agent bootstrap guide](plugins/dsh-agent-team/docs/bootstrap.md) and [complete installation guide](docs/dsh-agent-team-install.md).
 
-Use the [Agent bootstrap guide](plugins/dsh-agent-team/docs/bootstrap.md) for guided initialization with existing setup and explicit MCP configuration. It is introduced in catalog v0.3.0, alongside Lead interactions, bounded waits, English main/Lead communication, explicit permission presets and safe Web homepage links.
+DSH Team defaults to native **full access** (`danger-full-access` / `never`, network enabled intent). It does not automatically inherit Codex sandbox, approval or network settings. Outer OS/process/admin restrictions remain effective. See [Team permissions](plugins/dsh-agent-team/docs/permissions.md).
 
-The version mapping for the published release is **catalog v0.3.0 → dsh-agent-team 0.4.0**, paired with **[dsh-team-roles 0.6.0](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0)** and exact DSH **`0.2.2-alpha.2`**. The unreleased candidate mapping is catalog 0.3.1 → dsh-agent-team 0.4.3, paired with the unreleased dsh-team-roles 0.6.1 candidate and exact DSH `0.2.2-alpha.3`; publication is pending. Normal installation uses the fixed published catalog tag, never `main`, a feature branch or a floating latest ref. Check [Releases](https://github.com/silverbullet233/oh-my-codex/releases) before selecting another version.
-
-The tag versions the entire catalog; plugins keep independent versions (published catalog v0.3.0 maps to `dsh-agent-team` 0.4.0, while the unreleased candidate maps to 0.4.3). Release archives and checksums are for inspection and packaging. Codex installs through the Git marketplace, not directly from a Release tarball.
+Catalog and plugin versions are independent: **v0.3.1 → dsh-agent-team 0.4.3**. Install through the fixed Git marketplace tag. Release archives and checksums are supplementary inspection artifacts and cannot be passed directly to `codex plugin add`.
 
 ## Update or roll back
 
@@ -40,7 +37,7 @@ codex plugin marketplace upgrade oh-my-codex
 codex plugin add dsh-agent-team@oh-my-codex
 ```
 
-An immutable tag stays on that tag. To select a different published tag, first remove the marketplace registration, then repeat the install commands with an explicit compatible version (the current candidate pin is shown below; publication pending — use the published `v0.3.0` tag for released installation until the candidate is tagged and verified):
+An immutable tag stays on that tag. To select a different published tag, first remove the marketplace registration, then repeat the install commands with an explicit compatible version (verify publication and compatibility before switching):
 
 ```sh
 codex plugin marketplace remove oh-my-codex

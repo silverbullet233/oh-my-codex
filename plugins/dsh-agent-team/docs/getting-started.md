@@ -4,62 +4,37 @@ The client starts its own ordinary Web host when first used. Perform one-time in
 
 ## Install the pinned Codex catalog
 
-The unreleased candidate catalog **v0.3.1** contains plugin **dsh-agent-team 0.4.3**; it is not tagged or published. The latest **published** catalog is **v0.3.0** with plugin **dsh-agent-team 0.4.0**. These are independent versions.
+Catalog **v0.3.1** maps to plugin **dsh-agent-team 0.4.3**, exact official DSH / Team Profile **0.2.2-alpha.3** and built **dsh-team-roles 0.6.1**. Catalog publication is pending until its reviewed commit is tagged and its workflow/assets are verified. Check the fixed Release before installing; never substitute `main`, a floating ref, or an older runtime/host.
 
-**Installation target (unreleased candidate):** catalog v0.3.1 / plugin 0.4.3; publication pending — no tag or Release assets exist yet. The latest published installation remains catalog v0.3.0 / plugin 0.4.0; use the published `v0.3.0` tag for released installation until this candidate is tagged and its assets are verified. The earlier catalog v0.2.1 / plugin 0.3.2 was published on 2026-10-31. The older v0.1.0 catalog uses the legacy client.
+This catalog repository is public as verified on 2026-11-08. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
 
-This catalog repository is public as verified on 2026-11-08; earlier private-repository installation observations describe their historical configuration. For a private mirror, Git must already authenticate an account with repository access; keep that authentication in the existing Git credential manager. Release publication does not change repository visibility. Never put tokens in repository URLs or MCP configuration.
+For both existing and isolated Codex homes, follow the complete [English installation guide](https://github.com/silverbullet233/oh-my-codex/blob/main/docs/dsh-agent-team-install.md). It contains profile backup/conflict checks, tag/asset verification, discovery of the manifest-bound runtime/Home, sanitized installation and separate static, CLI and actual MCP checks. The [bootstrap guide](bootstrap.md) summarizes the same path for an Agent.
 
-**Unreleased candidate (catalog 0.3.1 / plugin 0.4.3, this branch):** the candidate is not tagged, has no Release assets and is not published; the `v0.3.1` pins below are release-preparation pins, not a published ref. It requires exact DSH `0.2.2-alpha.3` and the matching **unreleased** dsh-team-roles 0.6.1 candidate build (the published 0.6.0 archive supports only `0.2.2-alpha.2`), installed from a locally built plugin package in an isolated home; see the repository development instructions. The published install below remains on catalog v0.3.0 / plugin 0.4.0 and exact DSH `0.2.2-alpha.2`.
-
-For the published v0.3.0 catalog's supplementary assets, an already authenticated GitHub CLI can download that fixed release with `gh release download v0.3.0 --repo silverbullet233/oh-my-codex --dir /absolute/new-empty-download-directory`; verify its `SHA256SUMS`. Git authentication and GitHub CLI authentication are separate prerequisites. The host archive below is public and uses its exact versioned URLs.
-
-Use a Codex CLI that supports plugin marketplaces:
+In the intended authorized Codex home, registration uses:
 
 ```sh
 codex plugin marketplace add https://github.com/silverbullet233/oh-my-codex.git --ref v0.3.1
 codex plugin add dsh-agent-team@oh-my-codex --json
 ```
 
-The install result's `installedPath` is the plugin directory used below. Start a new Codex session after setup. Codex installs through the fixed Git marketplace tag, not directly from a Release tarball. Changing an existing marketplace's ref requires removing that registration first; this does not delete DSH data. Do not register `main`, a feature branch or a floating latest ref for normal use. The `v0.3.1` ref above is the candidate release-preparation pin; for released installation substitute the published `v0.3.0` tag until the candidate is tagged and verified.
+Keep the returned `installedPath`. Discover this plugin's resolved transport through `codex mcp list --json`; its `env` supplies `DSH_AGENT_TEAM_RUNTIME=${PLUGIN_DATA}/runtime/node_modules/@deepseek-ai/dsh` and `DSH_AGENT_TEAM_HOME=${PLUGIN_DATA}/dsh-home`, already expanded by Codex into absolute paths. Install official `@deepseek-ai/dsh@0.2.2-alpha.3` under that runtime directory and run setup with those same paths. Do not choose an unrelated runtime/Home or edit an installed manifest. Restart a client using the same Codex home and a verified Node >=24.9.0 on PATH; DSH terminal exports are not required for MCP.
 
-## Agent-guided initialization
+## Verify and install the released host
 
-Ask your AI Agent to follow [the bootstrap guide](bootstrap.md). It coordinates the existing explicit runtime/Home configuration, verified host download, setup and health checks; there is no separate bootstrap installer or automatic MCP discovery. The guide and setup repeat-safety changes are included from catalog v0.3.0. The equivalent manual steps are below.
-
-**MCP connection caveat:** published plugin 0.4.0 does not forward DSH environment variables through Codex's stdio filtering, so the manual published commands below validate the CLI only. The candidate fixes binding with `${PLUGIN_DATA}` paths in its manifest. Discover those paths with `codex mcp list --json` in the authorized Codex home before candidate setup; arbitrary exported runtime/Home paths will not override them. Follow the [complete agent installation guide](https://github.com/silverbullet233/oh-my-codex/blob/main/docs/dsh-agent-team-install.md) for existing-profile backup, candidate source-build installation and actual MCP validation. Do not install the published combination expecting full MCP integration until the user accepts its limitation.
-
-## Prepare the published runtime and released host
-
-Use Node >=24.9.0. Install the exact official DSH runtime in a separate directory, leaving any global installation alone. The published plugin 0.4.0 requires exact `0.2.2-alpha.2`; the unreleased candidate requires `0.2.2-alpha.3` instead, as noted above:
+In a new private download directory:
 
 ```sh
-npm install --prefix /absolute/dsh-runtime @deepseek-ai/dsh@0.2.2-alpha.2 --ignore-scripts
-export DSH_AGENT_TEAM_RUNTIME=/absolute/dsh-runtime/node_modules/@deepseek-ai/dsh
-export DSH_AGENT_TEAM_HOME=/absolute/new-dedicated-dsh-home
-```
-
-Download the built [host 0.6.0 release](https://github.com/silverbullet233/dsh-team-roles/releases/tag/v0.6.0), check its checksum, and keep the archive's absolute path. In a new download directory:
-
-```sh
-curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.0/dsh-team-roles-0.6.0.tgz -o dsh-team-roles-0.6.0.tgz
-curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.0/SHA256SUMS -o SHA256SUMS
+curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.1/dsh-team-roles-0.6.1.tgz -o dsh-team-roles-0.6.1.tgz
+curl -fL https://github.com/silverbullet233/dsh-team-roles/releases/download/v0.6.1/SHA256SUMS -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-dsh_host_archive="$(pwd)/dsh-team-roles-0.6.0.tgz"
+printf '%s  %s\n' '00f3fbf359289afa648fe8ef57b01739631c3ea70184f7f9351323dae1fcf669' 'dsh-team-roles-0.6.1.tgz' | shasum -a 256 -c -
 ```
 
-From the `installedPath` returned by Codex, in the same terminal:
+Both checks must pass. Use the built archive, not GitHub's automatic source archive. With the discovered nonsecret DSH paths supplied to the setup process, run the installed `scripts/setup.mjs` with this archive and the authorized workspace as arguments. Setup installs the exact official Team Profile and host into an empty dedicated Home with scripts disabled. It refuses partial or mismatched installations; it does not install the runtime or migrate personal data.
 
-```sh
-cd /absolute/installed-plugin-path
-node scripts/setup.mjs "$dsh_host_archive" /absolute/authorized/workspace
-node scripts/client.mjs health
-node scripts/client.mjs web
-```
+First validate the installed MCP identity, protocol and all 18 exact tool names. CLI health can then start the dedicated ordinary Web host without model requests. Finally restart/reload the authorized Codex client and call that server's **actual `dsh_team_health`**: require `owned: true`, native API 1, compatible capabilities, exact runtime, expected roles and attributed Home/runtime/workspace. Direct Node/CLI checks alone do not establish Codex MCP integration. Plugin 0.4.0's missing environment forwarding is historical; 0.4.3 uses the supported manifest binding verified through real Codex app-server.
 
-Setup claims an empty private home, saves the launch workspace, and uses that exact CLI to install the ordinary Web profile, official Team bundle and verified host tarball. It does not launch a model or configure provider credentials. The first health lazily starts native Web; normal native first-run authentication/storage behavior belongs to DSH. Configure existing provider authentication and roles in native Web before submitting work. The launch workspace supplies the default native workspace allowlist; deployment changes remain native profile configuration. Older host 0.3.0/0.4.0 use a different transport and are incompatible.
-
-The two environment variables must be available to **Codex's MCP server process** through its manifest, not merely exported in the parent terminal. Published 0.4.0 is blocked here; candidate 0.4.3 supplies its discovered plugin-data paths. Restart that server and call its actual `dsh_team_health`; CLI health alone does not confirm MCP connectivity. Exporting them in an unrelated terminal does not update an already running desktop app. Do not put launch tokens, API cookies or provider credentials in MCP configuration.
+Do not create a Team, invoke a model, copy authentication, or open a browser as an installation test. Configure provider authentication and roles later through native DSH when separately authorized. If cleaning up, call `dsh_team_shutdown` only for this attributed idle host and verify its result; MCP EOF leaves the host alive.
 
 Explicitly ask Codex to use DSH Agent Team. Under the [orchestration contract](orchestration.md), main clarifies requirements/design, defines decomposition and acceptance, and delegates all implementation/testing/debugging to Lead. Main owns progress and independent read-only review; correction instructions go only to Lead. If Lead cannot proceed, main escalates to the user rather than taking over. Read-only member observations are allowed; direct member instructions are not. This is skill guidance, not global tool removal.
 
@@ -81,7 +56,7 @@ Keep `teamId` and the create/input IDs. Send follow-ups to that Team rather than
 
 ## Migration and troubleshooting
 
-Keep an existing 0.5.0 Home intact. Setup for this release requires host 0.6.0 and refuses to overwrite a mismatched installation. Use a new dedicated Home, then deliberately plan any native Session/data migration; do not upgrade a live or personal profile automatically.
+Keep an existing older Home intact. Setup for this release requires host 0.6.1 and refuses to overwrite a mismatched installation. Use a new dedicated Home, then deliberately plan any native Session/data migration; do not upgrade a live or personal profile automatically.
 
 `DSH_AGENT_TEAM_SOCKET` and all socket fallbacks are removed. The host keeps legacy receipt/projection storage identities, but the client cannot adopt an arbitrary old home. For a data migration, stop both writers, prepare a new owned home, and deliberately migrate native Sessions, related attachments, role state and nonsecret role/provider configuration while preserving their relationships. Keep the new ownership marker and installation. Reauthenticate through native DSH; do not copy credentials automatically.
 
@@ -97,4 +72,4 @@ Keep an existing 0.5.0 Home intact. Setup for this release requires host 0.6.0 a
 
 Health and Web handoff return `diagnostics.path`, and startup errors include the corresponding local diagnostic path. Each instance retains a private 0600 JSON log with at most 64 KiB of recent native stdout/stderr, including output after readiness. Launch capabilities, URL queries, cookies and credential fields are redacted before writing. Inspect that local file when activation or runtime calls fail; never copy private launch metadata into reports. Oversized native lines are omitted rather than logging an unlabelled suffix.
 
-This unreleased candidate defaults to [DSH native full access](permissions.md): `danger-full-access`/`never`, network enabled intent. Codex sandbox/approval/network settings are not automatically inherited. Explicit profiles remain optional; outer OS/process/admin restrictions still apply. Published release instructions above retain their version scope.
+Plugin 0.4.3 defaults to [DSH native full access](permissions.md): `danger-full-access`/`never`, network enabled intent. Codex sandbox/approval/network settings are not automatically inherited. Explicit profiles remain optional; outer OS/process/admin restrictions still apply.

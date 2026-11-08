@@ -67,8 +67,10 @@ test('agent guide selects an authorized home and preserves existing-profile boun
   assert(!guide.includes('CODEX_HOME="$dsh_install_root/codex-profile"'));
   assert(guide.includes('profile-backup/config.toml'));
   assert(guide.includes('Do not restore the entire configuration backup'));
-  assert(guide.includes('actual MCP integration blocked by missing environment forwarding'));
-  assert(guide.includes('No working desktop-specific override is claimed here'));
+  assert(guide.includes('${PLUGIN_DATA}'));
+  assert(guide.includes('codex mcp list --json'));
+  assert(guide.includes('no separate desktop-specific override is claimed'));
+  assert(guide.includes('dsh_team_shutdown'));
   assert(guide.includes('Do not copy authentication'));
   assert(guide.includes('dsh_team_health'));
 });
