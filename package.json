@@ -17,7 +17,8 @@
     "pack:check": "npm run pack:check --workspaces --if-present",
     "release:prepare": "node scripts/release/prepare.mjs",
     "test:install": "node scripts/test-codex-install.mjs",
-    "test:isolated": "node --test test/*.test.mjs && npm run test:isolated --workspaces --if-present"
+    "test:isolated": "node --test test/*.test.mjs && npm run test:isolated --workspaces --if-present",
+    "test:mcp-env": "node scripts/test-codex-mcp-env.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.6-alpha.2",

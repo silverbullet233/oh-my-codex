@@ -14,6 +14,15 @@ const bin = join(directory, 'bin');
 const quote = value => `'${value.replaceAll("'", "'\"'\"'")}'`;
 try {
   await Promise.all([source, home, bin].map(path => mkdir(path)));
+  // Model a pre-existing home without using any real user configuration or credentials.
+  const existingConfig = '# Existing user settings must survive plugin operations\nmodel = "fixture-model"\n\n[mcp_servers.unrelated_fixture]\ncommand = "fixture-command"\n';
+  await writeFile(join(home, 'config.toml'), existingConfig);
+  await writeFile(join(home, 'unrelated-user-file'), 'keep me\n');
+  const assertExistingProfile = async () => {
+    const config = await readFile(join(home, 'config.toml'), 'utf8');
+    for (const line of existingConfig.trim().split('\n').filter(Boolean)) assert(config.includes(line), `Existing config changed: ${line}`);
+    assert.equal(await readFile(join(home, 'unrelated-user-file'), 'utf8'), 'keep me\n');
+  };
   const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
   const env = {
     ...process.env, CODEX_HOME: home, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
@@ -71,6 +80,7 @@ try {
     // Refreshing a pinned immutable ref stays on that ref; it does not select a newer tag.
     cli(['marketplace', 'upgrade', 'oh-my-codex']);
     const installed = cli(['add', 'dsh-agent-team@oh-my-codex']);
+    await assertExistingProfile();
     assert.equal(installed.version, snapshot.version);
     assert.equal(await readFile(join(installed.installedPath, 'README.md'), 'utf8'), `${snapshot.marker}\n`);
     assert(installed.installedPath.startsWith(`${await realpath(home)}/`));
@@ -86,5 +96,6 @@ try {
   }
   cli(['remove', 'dsh-agent-team@oh-my-codex']);
   cli(['marketplace', 'remove', 'oh-my-codex']);
-  console.log(JSON.stringify({ localFixturesOnly: true, isolatedHome: true, observed }, null, 2));
+  await assertExistingProfile();
+  console.log(JSON.stringify({ localFixturesOnly: true, isolatedHome: true, existingProfilePreserved: true, observed }, null, 2));
 } finally { await rm(directory, { recursive: true, force: true }); }
